@@ -588,10 +588,19 @@ carved and still blocked by a later room's wall. Both run, because they fail for
 - Attempt `i` uses `random.Random(derive(run_seed, f"gen.embed:{i}"))`, so every attempt is a different
   deterministic layout and the whole sequence is reproducible from the stored `run_seed`.
 - A failed attempt is discarded entirely; it does not reuse rooms or corridors.
-- After 8 failures, fall back to the **spine layout**: rooms placed left-to-right in graph depth
-  order at fixed y, connected by straight horizontal corridors. It is guaranteed connected by
-  construction and cannot fail verification. The fallback is logged with the seed and the failing
-  assertion, and is a bug report, not a design outcome.
+- After 8 failures, fall back to the **spine layout**: every non-side room stacked in graph depth
+  order along the longer axis, side rooms in a second column beside their parents, connected by
+  straight corridors. It is guaranteed connected by construction and cannot fail *connectivity* —
+  but it **can** fail the separation rule, which is a bug that shipped in the first draft of this
+  fallback: sabotage has two objectives, `main_path()` routes through only one of them, so the other
+  landed beside the entry at 11 cells against a minimum of 12, on all 12 sabotage seeds. Stacking
+  **every** non-side node rather than just the main path puts each objective at least two rooms
+  below the entry and clears the rule with room to spare.
+- The stacking direction is not cosmetic: a horizontal spine **does not fit**. Extraction's
+  main-path rooms are 58 cells wide and five separating walls make 63 > 60. Stacked heights are 44
+  plus five gaps, which fits.
+- The fallback is logged with the seed and the failing assertion, and is a bug report, not a design
+  outcome.
 - A Site that fails verification is never handed to the player (procedural-gen's first pitfall).
 
 ---
