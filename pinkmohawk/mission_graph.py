@@ -76,8 +76,9 @@ class Node:
 class MissionGraph:
     """Typed DAG of objective nodes. `add` then `link`; both enforce the constraints."""
 
-    def __init__(self) -> None:
+    def __init__(self, job_type: str | None = None) -> None:
         self.nodes: dict[int, Node] = {}
+        self.job_type = job_type
         self._next_id = 0
 
     # -- construction ---------------------------------------------------------------------
@@ -127,6 +128,10 @@ class MissionGraph:
     # -- queries --------------------------------------------------------------------------
     def of_kind(self, kind: str) -> list[int]:
         return [n for n, node in self.nodes.items() if node.kind == kind]
+
+    def edges(self) -> list[tuple[int, int]]:
+        """Every (parent, child) edge. The embedder carves one corridor per edge."""
+        return [(n, c) for n, node in self.nodes.items() for c in node.outgoing]
 
     def single(self, kind: str) -> int:
         found = self.of_kind(kind)
@@ -291,7 +296,7 @@ def build_graph(job_type: str, rng: random.Random, max_attempts: int = 8) -> Mis
     cfg = JOB_GRAPH[job_type]
 
     for _ in range(max_attempts):
-        g = MissionGraph()
+        g = MissionGraph(job_type)
         cur = g.add(ENTRY)
 
         for _ in range(cfg["sec_pre"]):
