@@ -30,7 +30,7 @@ Five functions, in dependency order:
 
 | Function | What it must do |
 |---|---|
-| `bsp_leaves` | recursively split the grid into exactly `count` rectangles, splitting the longer axis, never below `MIN_LEAF_EDGE` on either side |
+| `bsp_leaves` | size-aware BSP: one leaf per room, cutting so each subtree can host the rooms it holds, returning leaves in room order |
 | `place_rooms` | one room per leaf, sized from `ROOM_INTERIOR`/`OBJECTIVE_INTERIOR` by node type, positioned with at least `WALL_MARGIN` of wall, **never overlapping another room** |
 | `carve_corridor` | an L-corridor, 1 cell wide, between two rooms, plus a doorway cell in each room's wall — H-then-V or V-then-H by a coin flip |
 | `embed` | orchestrate: split, order leaves by graph depth, place, carve one corridor per graph edge, verify, and **retry on a fresh derived stream**, falling back to the spine after `MAX_EMBED_ATTEMPTS` |
@@ -138,12 +138,16 @@ class Site:
 # ======================================================================================
 # YOURS: the generator
 # ======================================================================================
-def bsp_leaves(width: int, height: int, count: int, rng) -> list[tuple[int, int, int, int]]:
-    """Split (0, 0, width, height) into exactly `count` rectangles: (x, y, w, h).
+def bsp_leaves(width: int, height: int, sizes, rng):
+    """One leaf per room, in room order, or None when the map cannot host them.
 
-    Recursive BSP: split the longer axis, at least `MIN_LEAF_EDGE` on both sides of the cut, until
-    the leaf count is reached. Return the leaves in the order you want step 2 to walk them (the
-    embedder re-orders by graph depth, so any deterministic order is acceptable here).
+    `sizes` is the ORDERED LIST of room interiors (entry first, exit last), not a count. A count is
+    not enough information: the splitter must know that one room is a 14x10 vault needing a 16x12
+    leaf once margins are included, or it will produce a 20x8 leaf and every attempt fails. A
+    count-based version of this function was written first and failed exactly that way.
+
+    Room order in, leaf order out. Returning leaves in the same sequence as `sizes` is what keeps
+    graph-adjacent nodes spatially adjacent, so no separate serpentine sort is needed.
     """
     raise NotImplementedError("implement bsp_leaves() — see the module docstring")
 
@@ -368,17 +372,21 @@ def demo() -> None:
         m.tiles[:] = bytes(s.map.tiles)
         return Site(m, dict(s.rooms), s.spawn, s.exit_cell, s.attempts, s.used_fallback, set(s.carved))
 
-    # (a) wall off a corridor -> connectivity must fail, both ways
+    # (a) seal the entry room entirely -> connectivity must fail, whatever alternate routes exist
     broken = clone(site)
-    victim_parent, victim_child = g.edges()[1]
-    c1, c2 = broken.rooms[victim_parent].center, broken.rooms[victim_child].center
-    path = a_star(broken.map, c1, c2)
-    assert path, "sanity: the corridor exists before we break it"
-    for (x, y) in path[len(path) // 2:len(path) // 2 + CORRIDOR_WIDTH + 2]:
-        broken.map.tiles[broken.map.idx(x, y)] = TILE_WALL
+    entry_room = broken.rooms[g.single(ENTRY)]
+    ring = [(x, y) for y in range(entry_room.y - 1, entry_room.y + entry_room.h + 1)
+            for x in range(entry_room.x - 1, entry_room.x + entry_room.w + 1)
+            if not entry_room.contains(x, y)]
+    for (x, y) in ring:
+        if broken.map.in_bounds(x, y):
+            broken.map.tiles[broken.map.idx(x, y)] = TILE_WALL
     problems = verify(broken, g)
-    assert any("no corridor" in p or "different component" in p or "unreachable" in p
-               for p in problems), f"sealing a corridor must be caught: {problems}"
+    # Sealing five cells of one corridor is NOT enough: with ten rooms the corridor network has
+    # alternate routes, so the Site stays connected and the test passes for the wrong reason. The
+    # ring seals every way in at once. (Found by running it.)
+    assert any("different component" in p or "unreachable" in p or "not walkable" in p
+               for p in problems), f"sealing the entry room must be caught: {problems}"
 
     # (b) overlap two rooms -> the overlap rule must fire
     shoved = clone(site)

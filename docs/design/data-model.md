@@ -2128,9 +2128,12 @@ Three rules, in priority order:
    `embed`, `bt`, and `utility` operate on coordinates, arrays, and plain data. `bt` receives an
    `eval_leaf` callback and a blackboard; it does not know what a Runner is. This keeps the practice
    code testable and keeps the dependency arrow pointing one way.
-3. **No cycles.** Layer N imports only layers < N (plus its own layer where noted: `embed` →
-   `grid`, `mission_graph`; `ai` → `run` only through the callback in `run.py`, never a module
-   import). If a module needs something from a higher layer, the dependency is wrong.
+3. **No cycles.** Layer N imports only layers < N (plus same-layer imports where a single
+   subsystem needs a peer: `embed` → `grid`, `mission_graph`, **and `pathfinding`**, because §6.3's
+   own verification calls A* to prove there is a walkable path — union-find alone cannot tell a
+   carved corridor from one a later room walled shut; `ai` → `run` only through the callback in
+   `run.py`, never a module import). If a module needs something from a higher layer, the
+   dependency is wrong.
 
 ### Enforcing rule 1 with a self-check
 
