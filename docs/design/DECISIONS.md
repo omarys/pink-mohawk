@@ -329,12 +329,12 @@ Resolved since the first draft. Recorded because each resolution was a real choi
 19. **Save field names are `world.md` §10.4's**; `schema_version`, not `version`; never persist `qi`.
 20. **`world.md` §5 owns the Mission Graph generator**, and its 10-node ceiling replaces `data-model.md`'s 20.
 21. **Voluntary extraction grants Fixer reputation +1.**
+22. **Font**: Spleen 8×16 bitmap (BSD-2-Clause), vendored at `assets/vendor/fonts/spleen-8x16.bdf`. The geometry forces it — a TTF rasterises at an arbitrary size and fights the 16px grid, while Spleen's native height is exactly 16px so its glyph is a byte-for-byte paste into the left 8 columns of the cell. Cozette (MIT) stays the documented TTF alternative if the look ever changes; its vector build is upstream's own compatibility flag and is warned against at any size.
 
 Still open, and genuinely undecided:
 
 1. **Hub movement**: turn-based steps with a world clock (recommended) versus real-time exploration.
-2. **Font**: TTF (Cozette, MIT) versus a bitmap font. Either way the file is fetched by hand.
-3. **Dead skill slots**: nine skill slots have no use outside their owner's domain at the starting stat blocks. Either give them cross-class uses or cut them from the sheet.
+2. **Dead skill slots**: nine skill slots have no use outside their owner's domain at the starting stat blocks. Either give them cross-class uses or cut them from the sheet.
 
 ## 15. Accepted risks
 

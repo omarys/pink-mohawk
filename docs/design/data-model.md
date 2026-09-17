@@ -150,7 +150,7 @@ recomputing, and it goes stale the moment terrain changes. Revisit only if profi
 |---|---|---|
 | `compute_fov(origin, R)` | O(R²) cells visited, ≤ 8 octant calls | O(1) extra (recursion depth ≤ R) |
 | write into `visible` | O(R²) | in-place |
-| at R = 8 | π·8² ≈ 201 cells | — |
+| at R = 8 | π·8² ≈ 201 cells visited; **197** actually lit | — |
 
 Recursion depth is ≤ R = 8, so there is no stack concern. The `visible` byte array is cleared by
 sweeping all `V` cells (O(V) = 3600) — cheaper than tracking a cell list.
@@ -236,7 +236,12 @@ if __name__ == "__main__":
         m.tiles[m.idx(1, 1)] = 0                  # one pillar, viewer at (0,0)
         compute_fov(m, 0, 0, 8)
         assert m.visible[m.idx(0, 0)] == 1        # origin always visible
-        assert m.visible[m.idx(1, 1)] == 0        # the pillar itself is a wall: never lit
+        assert m.visible[m.idx(1, 1)] == 1        # walls in view ARE lit -- the renderer has to
+                                                  # draw the wall you are standing next to
+        # A hardcoded cell behind a pillar is slope-sensitive and brittle. The robust form is
+        # differential: recompute the same map with the pillar removed and assert that it lights
+        # strictly more cells. That is what fov.py's demo does, plus a deliberately permissive
+        # reference implementation to prove the assertion can fail.
 
         # ---- diagonal gap: two diagonal walls with a gap between them ----------------------
         m2 = TileMap(11, 11)
