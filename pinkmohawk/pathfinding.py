@@ -55,6 +55,8 @@ one flag away; `demo()` has a case for each so the choice is visible rather than
 
 from __future__ import annotations
 
+import heapq
+from collections import deque
 from collections.abc import Iterable, Iterator
 from typing import Final
 
@@ -86,7 +88,13 @@ def neighbors(m: TileMap, x: int, y: int, *,
     `m.is_wall` already reports them as walls, but yielding them would put a phantom node in the
     search.
     """
-    raise NotImplementedError("implement neighbors() — see the module docstring")
+    for dx, dy in DIRECTIONS:
+        nx, ny = x + dx, y + dy
+        if not m.in_bounds(nx, ny) or m.is_wall(nx, ny):
+            continue
+        if dx and dy and not allow_corner_cutting and m.is_wall(x + dx, y) and m.is_wall(x, y + dy):
+            continue
+        yield (nx, ny)
 
 
 def a_star(m: TileMap, start: Coord, goal: Coord, *,
@@ -97,17 +105,59 @@ def a_star(m: TileMap, start: Coord, goal: Coord, *,
     The returned list must be a valid path: consecutive cells are neighbours, no cell is a wall, and
     its length minus one equals the minimum step count (asserted against an oracle in demo()).
     """
-    raise NotImplementedError("implement a_star() — see the module docstring")
+    if m.is_wall(*start) or m.is_wall(*goal):
+        return None
+    if start == goal:
+        return [start]
+
+    # Heap key is (f, h, tie, x, y): search quality, then the node that looks closer to the goal,
+    # then insertion order. The tie counter is what makes equal-cost paths resolve identically on
+    # every run — never let dict or set iteration order decide a route.
+    heap: list[tuple[int, int, int, int, int]] = [
+        (chebyshev(start, goal), chebyshev(start, goal), 0, *start)
+    ]
+    came: dict[Coord, Coord] = {}
+    best: dict[Coord, int] = {start: 0}
+    tie = 0
+
+    while heap:
+        f, h, _, x, y = heapq.heappop(heap)
+        cur = (x, y)
+        g = best.get(cur)
+        if g is None or g != f - h:
+            continue                      # stale entry: a cheaper route to cur landed after this push
+        if cur == goal:
+            path = [cur]
+            while cur in came:
+                cur = came[cur]
+                path.append(cur)
+            path.reverse()
+            return path
+
+        for nb in neighbors(m, x, y, allow_corner_cutting=allow_corner_cutting):
+            ng = g + 1                    # every step costs 1 Energy, so every edge weighs 1
+            if ng < best.get(nb, UNREACHABLE):
+                best[nb] = ng
+                came[nb] = cur
+                tie += 1
+                heapq.heappush(heap, (ng + chebyshev(nb, goal), chebyshev(nb, goal), tie, *nb))
+
+    return None
 
 
 def step_toward(m: TileMap, start: Coord, goal: Coord, *,
                 allow_corner_cutting: bool = False) -> Coord | None:
     """The first cell of an optimal path, or None. What a Behavior Tree's `move_to` needs.
 
-    None when start == goal (you have arrived) or when the goal is unreachable. This exists so AI
-    can move one step per decision step without materialising a full path it will not follow.
+    None when start == goal (you have arrived) or when the goal is unreachable. The first step cannot
+    be known to be optimal without completing the search, so this runs the full A* and returns
+    `path[1]`. The saving is at the call site — AI asks "which way" and never stores or follows a
+    route — not inside the search.
     """
-    raise NotImplementedError("implement step_toward() — see the module docstring")
+    if start == goal or m.is_wall(*start) or m.is_wall(*goal):
+        return None
+    path = a_star(m, start, goal, allow_corner_cutting=allow_corner_cutting)
+    return None if path is None or len(path) < 2 else path[1]
 
 
 def flow_map(m: TileMap, sources: Iterable[Coord], *,
@@ -119,7 +169,31 @@ def flow_map(m: TileMap, sources: Iterable[Coord], *,
     running its own search. Sources that are walls or out of bounds are ignored. Walls and
     unreachable cells carry `UNREACHABLE`.
     """
-    raise NotImplementedError("implement flow_map() — see the module docstring")
+    field = bytearray([UNREACHABLE]) * (m.w * m.h)
+    q: deque[tuple[Coord, int]] = deque()
+
+    for s in sources:
+        i = m.idx(*s)
+        if m.is_wall(*s):
+            continue
+        if field[i] != 0:
+            field[i] = 0
+            q.append((s, 0))
+
+    # Plain BFS, not Dijkstra: every edge weighs 1, so the queue is already in priority order.
+    # All sources are seeded at 0, which is what makes this the *nearest*-source field.
+    while q:
+        (x, y), d = q.popleft()
+        nd = d + 1
+        if nd >= UNREACHABLE:
+            continue
+        for nb in neighbors(m, x, y, allow_corner_cutting=allow_corner_cutting):
+            i = m.idx(*nb)
+            if field[i] == UNREACHABLE:
+                field[i] = nd
+                q.append((nb, nd))
+
+    return field
 
 
 def step_downhill(field: bytearray, width: int, x: int, y: int, *,
@@ -129,7 +203,31 @@ def step_downhill(field: bytearray, width: int, x: int, y: int, *,
     None at a source (cost 0), on a wall, or on an `UNREACHABLE` cell. Deterministic: ties resolve
     in DIRECTIONS order, never by iteration over a set.
     """
-    raise NotImplementedError("implement step_downhill() — see the module docstring")
+    height = len(field) // width
+    if not (0 <= x < width and 0 <= y < height):
+        return None
+    here = field[y * width + x]
+    if here == 0 or here == UNREACHABLE:
+        return None                      # a source, a wall, or sealed ground
+
+    best_cost, best = here, None
+    for dx, dy in DIRECTIONS:
+        nx, ny = x + dx, y + dy
+        if not (0 <= nx < width and 0 <= ny < height):
+            continue
+        cost = field[ny * width + nx]
+        if cost == UNREACHABLE or cost >= best_cost:
+            continue                     # strict '<' keeps ties in DIRECTIONS order
+        if dx and dy and not allow_corner_cutting:
+            # Passability proxy: UNREACHABLE means wall or sealed. The field already encodes the
+            # corner rule, so this only matters when field values happen to differ by one across a
+            # sealed seam — rare, but movement must not depend on that coincidence.
+            if (field[y * width + nx] == UNREACHABLE
+                    and field[ny * width + x] == UNREACHABLE):
+                continue
+        best_cost, best = cost, (nx, ny)
+
+    return best
 
 
 # ======================================================================================
@@ -137,7 +235,6 @@ def step_downhill(field: bytearray, width: int, x: int, y: int, *,
 # ======================================================================================
 def demo() -> None:
     import random
-    from collections import deque
 
     def open_map(w: int, h: int) -> TileMap:
         m = TileMap(w, h)
@@ -240,9 +337,17 @@ def demo() -> None:
     for y in range(12):
         for x in range(12):
             d.tiles[d.idx(x, y)] = 0 if rng2.random() < 0.25 else 1
+    # Carve a guaranteed route (top row, right column). At 25% wall density the corner rule can
+    # seal the map, and sections 9, 12 and 13 assume a path exists — a first draft of this test
+    # forgot that and compared None == None, which passes for the wrong reason.
+    for x in range(12):
+        d.tiles[d.idx(x, 0)] = 1
+    for y in range(12):
+        d.tiles[d.idx(11, y)] = 1
     d.tiles[d.idx(0, 0)] = 1
     d.tiles[d.idx(11, 11)] = 1
     first = a_star(d, (0, 0), (11, 11))
+    assert first is not None, "the carved map must be traversable"
     assert all(a_star(d, (0, 0), (11, 11)) == first for _ in range(5)), "A* is not deterministic"
 
     # ---- 9. step_toward agrees with a_star ---------------------------------------------
