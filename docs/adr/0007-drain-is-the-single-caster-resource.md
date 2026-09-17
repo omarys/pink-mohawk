@@ -1,0 +1,7 @@
+# Drain is the single resource for all three Casters
+
+Mage, Shaman, and Decker all pay Stun for their primary abilities. They are separated by *what they act on*, not by *what they spend*: the Mage casts directly on people and space (damage, detection, healing, illusion, armour), the Shaman conjures Spirits as real actors plus area and terrain effects, and the Decker hacks devices — guns, optics, doors, lights, commlinks — in the physical world. Drain is resisted with Willpower + the class's Tradition Attribute (Logic for Mage and Decker, Charisma for the Shaman). This also gives every Caster a second, self-inflicted health track alongside the Physical one.
+
+**Considered options**: a separate Resonance pool for the Decker (rejected: two resource systems where one is sufficient, and the Decker's Drain is thematically defensible as biofeedback from a hot connection); Marks plus an Overwatch timer as the hacking model (rejected: a second clock per device set on top of the Security Clock); cooldowns instead of Drain (rejected: no scarcity, no tension, clashes with pools used everywhere else).
+
+**Consequences**: three of four classes draining Stun is a genuine homogenisation risk — the class differentiation now rests entirely on target type and effect, so any new ability that does not clearly belong to one Caster's *domain* weakens the roster. Balance-wise, Stun is both a resource and a liability, so a long fight degrades every Caster at once.

@@ -1,0 +1,12 @@
+# venv — recreate with: python3 -m venv .venv && .venv/bin/pip install tcod numpy
+.venv/
+
+# Vendored but unused in v1: 18MB, 4,357 PNGs, 32x32, fantasy-dungeon flavoured.
+# Kenney RPG Urban + Kenney Modern City cover the vertical slice (docs/art/pipeline.md §2).
+# Re-fetch: https://github.com/crawl/tiles
+assets/vendor/dcss-tiles/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
