@@ -35,6 +35,7 @@ from enum import Enum
 from typing import Any, Final
 
 from .constants import ENERGY_COSTS, MAX_TICKS_PER_STEP
+from .errors import RuntimeFailure, ValidationError
 
 #: The eight node types of DECISIONS §8, one spelling per concept (ai.md §2).
 NODE_TYPES: Final = ("selector", "sequence", "condition", "action",
@@ -64,22 +65,22 @@ class Status(Enum):
     RUNNING = "RUNNING"
 
 
-class SchemaError(ValueError):
+class SchemaError(ValidationError):
     """The document is malformed, or validation was skipped. Nothing malformed reaches runtime."""
 
 
-class BTLivelock(RuntimeError):
+class BTLivelock(RuntimeFailure):
     """A tree resolved more leaves than MAX_TICKS_PER_STEP inside one decision step."""
 
 
-class HandlerError(RuntimeError):
+class HandlerError(RuntimeFailure):
     """A leaf handler broke the leaf contract — e.g. a Condition returning RUNNING."""
 
 
 # ----------------------------------------------------------------------------------------------
 # The parsed, immutable tree
 # ----------------------------------------------------------------------------------------------
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Node:
     """One node. Frozen: trees are shared between actors and must never hold state."""
 
@@ -99,7 +100,7 @@ class Node:
         return self.name or self.path
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Tree:
     id: str
     archetype: str | None
@@ -107,7 +108,7 @@ class Tree:
     root: Node
 
 
-@dataclass
+@dataclass(slots=True)
 class BTState:
     """Everything mutable about one actor's use of a tree. One per actor; never shared."""
 
@@ -135,7 +136,7 @@ class BTState:
         self.root_status = None
 
 
-@dataclass
+@dataclass(slots=True)
 class TickContext:
     """What a handler is given, and where it records what it did.
 
@@ -274,7 +275,7 @@ def load(document: Mapping[str, Any], *, known_actions: Mapping[str, frozenset[s
 # ----------------------------------------------------------------------------------------------
 # The ticker (ai.md §4.3) — an explicit stack, RESUMED from `state`, one leaf per tick
 # ----------------------------------------------------------------------------------------------
-@dataclass
+@dataclass(slots=True)
 class _Frame:
     node: Node
     phase: str                       # "DESCEND" | "ASCEND"

@@ -33,6 +33,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Final
 
+from .errors import ValidationError
+
 # --- generator parameters (docs/design/world.md §5.2, §5.3) -----------------------------------
 MAX_IN_DEGREE: Final = 2          # [P12]: a second in-edge makes a merge, the only legal diamond
 SIDE_CHAIN_MAX: Final = 2         # [P11]: side nodes in a single chain
@@ -56,11 +58,11 @@ ENTRY, SECURITY, OBJECTIVE, SIDE, EXIT = "entry", "security", "objective", "side
 KINDS: Final = (ENTRY, SECURITY, OBJECTIVE, SIDE, EXIT)
 
 
-class GraphError(ValueError):
+class GraphError(ValidationError):
     """A structural rule from world.md §5.2 was violated at build time."""
 
 
-@dataclass
+@dataclass(slots=True)
 class Node:
     id: int
     kind: str
@@ -75,6 +77,8 @@ class Node:
 
 class MissionGraph:
     """Typed DAG of objective nodes. `add` then `link`; both enforce the constraints."""
+
+    __slots__ = ("nodes", "job_type", "_next_id")
 
     def __init__(self, job_type: str | None = None) -> None:
         self.nodes: dict[int, Node] = {}

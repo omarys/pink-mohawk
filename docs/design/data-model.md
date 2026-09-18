@@ -2094,6 +2094,7 @@ if __name__ == "__main__":
 pinkmohawk/
   constants.py      # every number from DECISIONS.md, named, commented with its §. Imports: none.
   rng.py            # derive(), make_rngs(), the STATIC_STREAMS registry. Imports: hashlib, random.
+  errors.py         # PinkMohawkError root + ValidationError / RuntimeFailure. Imports: none.
   unionfind.py      # DisjointSet: union by size + path compression. Imports: none.
   utility.py        # response curves, considerations, weighted scoring, hysteresis. Imports: math.
   grid.py           # TileMap: tiles / explored / visible bytearrays + bounds rules. Imports: array.

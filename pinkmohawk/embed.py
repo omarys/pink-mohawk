@@ -53,10 +53,12 @@ from __future__ import annotations
 
 import random
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Final
 
 from .constants import SITE_H, SITE_W, TILE_FLOOR, TILE_WALL
+from .errors import RuntimeFailure
 from .grid import TileMap
 from .mission_graph import ENTRY, EXIT, OBJECTIVE, SECURITY, SIDE, MissionGraph
 from .pathfinding import a_star
@@ -91,11 +93,11 @@ OBJECTIVE_INTERIOR: Final = {
 }
 
 
-class EmbedError(RuntimeError):
+class EmbedError(RuntimeFailure):
     """Embedding failed. A Site that would fail verification is never handed to the player."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Room:
     """One room, in map coordinates, interior only (the wall ring is not part of w/h)."""
 
@@ -126,7 +128,7 @@ class Room:
         )
 
 
-@dataclass
+@dataclass(slots=True)
 class Site:
     """A generated, verified Site. `rooms` is keyed by Mission Graph node id."""
 
@@ -211,7 +213,8 @@ def _finish(
     return site
 
 
-def _split(x: int, y: int, w: int, h: int, sizes: list[tuple[int, int]], rng):
+def _split(x: int, y: int, w: int, h: int, sizes: list[tuple[int, int]],
+           rng: random.Random):
     """
     Size-aware BSP. Returns a leaf per room, IN ROOM ORDER, or None if this rect cannot host them.
 
@@ -253,13 +256,18 @@ def _split(x: int, y: int, w: int, h: int, sizes: list[tuple[int, int]], rng):
 # ======================================================================================
 # YOURS: the generator
 # ======================================================================================
-def bsp_leaves(width: int, height: int, sizes, rng):
+def bsp_leaves(width: int, height: int, sizes: Sequence[tuple[int, int]],
+               rng: random.Random):
     """One leaf per room, in room order, or None when the map cannot host them."""
     return _split(0, 0, width, height, list(sizes), rng)
 
 
 def place_rooms(
-    graph: MissionGraph, leaves, rng, width: int = SITE_W, height: int = SITE_H
+    graph: MissionGraph,
+    leaves: Sequence[tuple[int, int, int, int]],
+    rng: random.Random,
+    width: int = SITE_W,
+    height: int = SITE_H,
 ) -> dict[int, Room]:
     nodes = _ordered_nodes(graph)
     if len(leaves) != len(nodes):
@@ -278,7 +286,7 @@ def place_rooms(
     return rooms
 
 
-def carve_corridor(site: Site, a: Room, b: Room, rng) -> set[tuple[int, int]]:
+def carve_corridor(site: Site, a: Room, b: Room, rng: random.Random) -> set[tuple[int, int]]:
     """Carve a 1-wide L-corridor between two room centres and open a doorway in each room's wall.
 
     Returns the cells carved. Overlapping corridors are absorbed, never widened.
