@@ -99,8 +99,10 @@ DAMAGE_STUN: Final = "S"
 TILE_WALL: Final = 0
 TILE_FLOOR: Final = 1
 
-# name -> (damage code, rating, ap as a POSITIVE magnitude, range in cells)
-WEAPONS: Final = {
+# name -> (DV, damage code, AP as a POSITIVE magnitude, range in cells). DV is an int, or a
+# `strength+N` string resolved against the wielder (rules.weapon_damage).
+type WeaponRow = tuple[int | str, str, int, int]
+WEAPONS: Final[dict[str, WeaponRow]] = {
     "heavy_pistol": (5, "P", 1, 8),
     "smg": (6, "P", 0, 10),
     "assault_rifle": (8, "P", 2, 14),
