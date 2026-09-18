@@ -1,0 +1,55 @@
+{
+  "_note": "Shop stock pools by Heat tier. The tier numbering is placement.heat_tier's, which world.md 8.3's five rows collapse into four: its bands are (0-2)(3-5)(6-8)(9-20), so the table's tier 4 is the same numbers as its tier 3 and only the freeze differs. Tier 3 here is therefore the ceiling pool and equals the full catalogue. Prices are NOT in this file: DECISIONS section 9 owns GEAR_PRICES and section 16 owns TRAUMA_PATCH_COST. The pools are price-banded - tier 0 stocks the six cheapest lines and each tier adds dearer ones - because world.md 3.2 says stock is weighted to the current tier without giving weights.",
+  "pools": {
+    "0": [
+      "ammunition",
+      "medkit",
+      "helmet",
+      "stun_baton",
+      "heavy_pistol",
+      "armoured_vest"
+    ],
+    "1": [
+      "ammunition",
+      "medkit",
+      "helmet",
+      "stun_baton",
+      "heavy_pistol",
+      "armoured_vest",
+      "katana",
+      "lined_coat"
+    ],
+    "2": [
+      "ammunition",
+      "medkit",
+      "helmet",
+      "stun_baton",
+      "heavy_pistol",
+      "armoured_vest",
+      "katana",
+      "lined_coat",
+      "smg",
+      "shotgun"
+    ],
+    "3": [
+      "ammunition",
+      "medkit",
+      "helmet",
+      "stun_baton",
+      "heavy_pistol",
+      "armoured_vest",
+      "katana",
+      "lined_coat",
+      "smg",
+      "shotgun",
+      "armoured_jacket",
+      "trauma_patch",
+      "assault_rifle",
+      "cyberdeck"
+    ]
+  },
+  "medical": [
+    "medkit",
+    "trauma_patch"
+  ]
+}

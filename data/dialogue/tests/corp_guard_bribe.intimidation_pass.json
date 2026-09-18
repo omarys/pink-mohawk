@@ -1,0 +1,25 @@
+{
+  "_note": "The Intimidation that lands: nine dice, four hits, net 1. The guard stands down, npc.pacified is set, and Arasaka reputation takes the -1 for it. No Clock segment is spent on a conversation that worked.",
+  "conversation": "corp_guard_bribe",
+  "seed": {
+    "skill.intimidation": 5,
+    "attr.charisma": 4,
+    "npc.alert_level": 1
+  },
+  "dice": [6, 6, 6, 6, 4, 4, 4, 4, 4],
+  "steps": [
+    { "expect_line": ["Corp Guard", "Halt. This floor's closed."] },
+    { "choose": "Back off or I put you through that wall." },
+    { "expect_line": ["Corp Guard", "Easy. Easy. Take the stairs."] },
+    { "expect_end": "end" },
+    {
+      "expect_store": {
+        "test.intimidation.hits": 4,
+        "test.intimidation.net": 1,
+        "rep.faction.corp_arasaka": -1,
+        "npc.pacified": true
+      },
+      "expect_clock": 0
+    }
+  ]
+}

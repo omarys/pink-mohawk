@@ -1,0 +1,118 @@
+{
+  "_note": "dialogue.md section 9, authored verbatim except one spelling: the alarm reason is `alarm_tripped` (DECISIONS section 9 and constants.CLOCK_TICKS), where the design document writes `alarm`.",
+  "id": "corp_guard_bribe",
+  "context": "site",
+  "cast": { "guard": "Corp Guard", "pc": "Runner" },
+  "pc": "pc",
+  "interlocutor": "guard",
+  "start": "guard_hail",
+  "on_empty": "guard_leave",
+  "vars": {
+    "guard_bribed": false,
+    "guard_alarmed": false,
+    "bribe_offered": false,
+    "intimidation_tried": false
+  },
+  "nodes": [
+    {
+      "id": "guard_hail",
+      "speaker": "guard",
+      "line": "Halt. This floor's closed.",
+      "choices": [
+        {
+          "text": "You look bored. 500 says you never saw me.",
+          "cond": "crew.nuyen >= 500 and flags.bribe_offered == False",
+          "goto": "bribe_offer",
+          "effects": [ { "set": "flags.bribe_offered", "value": true } ]
+        },
+        {
+          "text": "Back off or I put you through that wall.",
+          "cond": "skill.intimidation >= 4 and flags.intimidation_tried == False",
+          "goto": "intimidation",
+          "effects": [ { "set": "flags.intimidation_tried", "value": true } ]
+        },
+        { "text": "Wrong floor. My mistake.", "goto": "guard_leave" }
+      ]
+    },
+
+    {
+      "id": "bribe_offer",
+      "speaker": "guard",
+      "line": "Five hundred? ...Show me.",
+      "choices": [
+        { "text": "Hand it over.", "goto": "bribe_pay" },
+        { "text": "On second thought, no.", "goto": "guard_hail" }
+      ]
+    },
+
+    {
+      "id": "bribe_pay",
+      "effects": [
+        { "set": "crew.nuyen", "expr": "crew.nuyen - 500" },
+        { "set": "flags.guard_bribed", "value": true }
+      ],
+      "goto": "bribe_result"
+    },
+
+    { "id": "bribe_result", "cond": "rep.faction.corp_arasaka <= -1", "then": "bribe_burned", "else": "bribe_taken" },
+
+    {
+      "id": "bribe_taken",
+      "speaker": "guard",
+      "line": "I was in the washroom. Forty seconds.",
+      "effects": [ { "set": "npc.pacified", "value": true } ],
+      "end": true
+    },
+
+    {
+      "id": "bribe_burned",
+      "speaker": "guard",
+      "line": "You're on Kowalski's list. ...Yeah, it's him. Third floor.",
+      "effects": [
+        { "tick_clock": "alarm_tripped" },
+        { "set": "npc.alert_level", "value": 2 }
+      ],
+      "end": true
+    },
+
+    {
+      "id": "intimidation",
+      "effects": [
+        { "test": { "key": "intimidation", "skill": "intimidation", "attribute": "charisma",
+                    "threshold": 3 } }
+      ],
+      "goto": "intimidation_result"
+    },
+
+    { "id": "intimidation_result", "cond": "test.intimidation.net >= 1", "then": "intimidation_win", "else": "intimidation_fail" },
+
+    {
+      "id": "intimidation_win",
+      "speaker": "guard",
+      "line": "Easy. Easy. Take the stairs.",
+      "effects": [
+        { "change_rep": { "who": "faction:corp_arasaka", "delta": -1 } },
+        { "set": "npc.pacified", "value": true }
+      ],
+      "end": true
+    },
+
+    {
+      "id": "intimidation_fail",
+      "speaker": "guard",
+      "line": "Security! Intruder on three!",
+      "effects": [
+        { "tick_clock": "gunfire" },
+        { "set": "npc.alert_level", "value": 2 }
+      ],
+      "end": true
+    },
+
+    {
+      "id": "guard_leave",
+      "speaker": "guard",
+      "line": "Move along.",
+      "end": true
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "_note": "dialogue.md 10.4's worked transcript: the clean bribe. 500 leaves the crew, the guard sets npc.pacified, and no Clock segment is spent.",
+  "conversation": "corp_guard_bribe",
+  "seed": {
+    "crew.nuyen": 2000,
+    "rep.faction.corp_arasaka": 0,
+    "npc.alert_level": 1
+  },
+  "dice": [],
+  "steps": [
+    { "expect_line": ["Corp Guard", "Halt. This floor's closed."] },
+    { "choose": "You look bored. 500 says you never saw me." },
+    { "expect_line": ["Corp Guard", "Five hundred? ...Show me."] },
+    { "choose": "Hand it over." },
+    { "expect_line": ["Corp Guard", "I was in the washroom. Forty seconds."] },
+    { "expect_end": "end" },
+    {
+      "expect_store": {
+        "crew.nuyen": 1500,
+        "flags.guard_bribed": true,
+        "flags.bribe_offered": true,
+        "npc.pacified": true,
+        "npc.alert_level": 1
+      },
+      "expect_clock": 0
+    }
+  ]
+}

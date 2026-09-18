@@ -1,0 +1,26 @@
+{
+  "_note": "The bribe the guard takes and then keys the panel on anyway: Arasaka reputation at -1 routes bribe_result to bribe_burned. The 500 is still spent, `alarm_tripped` costs 2 Clock segments, and alert_level goes to 2 Lockdown - the same key the guard tree's own call_backup writes.",
+  "conversation": "corp_guard_bribe",
+  "seed": {
+    "crew.nuyen": 2000,
+    "rep.faction.corp_arasaka": -1,
+    "npc.alert_level": 1
+  },
+  "dice": [],
+  "steps": [
+    { "expect_line": ["Corp Guard", "Halt. This floor's closed."] },
+    { "choose": "You look bored. 500 says you never saw me." },
+    { "expect_line": ["Corp Guard", "Five hundred? ...Show me."] },
+    { "choose": "Hand it over." },
+    { "expect_line": ["Corp Guard", "You're on Kowalski's list. ...Yeah, it's him. Third floor."] },
+    { "expect_end": "end" },
+    {
+      "expect_store": {
+        "crew.nuyen": 1500,
+        "npc.alert_level": 2,
+        "npc.pacified": false
+      },
+      "expect_clock": 2
+    }
+  ]
+}

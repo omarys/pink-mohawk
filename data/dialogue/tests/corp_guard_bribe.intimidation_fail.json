@@ -1,0 +1,26 @@
+{
+  "_note": "dialogue.md 10.4 names this file as the fail transcript for the Intimidation test: nine dice, no hits, no glitch, net -3. The guard shouts and the Clock takes `gunfire` +2 with alert_level at 2. The critical-glitch variant is its own transcript.",
+  "conversation": "corp_guard_bribe",
+  "seed": {
+    "skill.intimidation": 5,
+    "attr.charisma": 4,
+    "npc.alert_level": 1
+  },
+  "dice": [2, 2, 4, 4, 4, 4, 4, 4, 4],
+  "steps": [
+    { "expect_line": ["Corp Guard", "Halt. This floor's closed."] },
+    { "choose": "Back off or I put you through that wall." },
+    { "expect_line": ["Corp Guard", "Security! Intruder on three!"] },
+    { "expect_end": "end" },
+    {
+      "expect_store": {
+        "test.intimidation.hits": 0,
+        "test.intimidation.net": -3,
+        "test.intimidation.glitch": false,
+        "npc.alert_level": 2,
+        "npc.pacified": false
+      },
+      "expect_clock": 2
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "_note": "dialogue.md 10.4. The haggle PASSES: the Fixer's 4 dice roll one hit, the Runner's 9 roll four, net 3. The choice text is used rather than an index, so adding a choice above it cannot silently retarget this test.",
+  "conversation": "fixer_offer",
+  "seed": {
+    "skill.negotiation": 4,
+    "attr.charisma": 5,
+    "job.payout_base": 12000,
+    "job.payout_agreed": 12000,
+    "rep.fixer": 0,
+    "crew.nuyen": 2000
+  },
+  "dice": [6, 4, 4, 4, 6, 6, 5, 5, 4, 4, 4, 4, 4],
+  "steps": [
+    { "expect_line": ["Fixer", "You're the crew, then. Sit down."] },
+    { "choose": "The pay is 12k, the risk is 15k." },
+    { "expect_line": ["Fixer", "You're pushing it. 12,300, and the deck comes back intact."] },
+    { "choose": "I'm in." },
+    { "expect_line": ["Fixer", "Vault's on sub-level three, service corridor. Loud gets you dead."] },
+    { "expect_end": "end" },
+    {
+      "expect_store": {
+        "job.payout_agreed": 12300,
+        "job.accepted": true,
+        "job.state": "accepted",
+        "flags.haggle_used": true,
+        "test.haggle.hits": 4,
+        "test.haggle.net": 3
+      },
+      "expect_clock": 0
+    }
+  ]
+}

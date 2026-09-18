@@ -1,0 +1,25 @@
+{
+  "_note": "The worst case in dialogue.md 9: a critical glitch on the Intimidation roll. The test fails on hits, `tick_clock('gunfire')` adds 2, and the runner's own critical-glitch segment adds 1 more - three segments from one conversation, which is ADR-0005's intent.",
+  "conversation": "corp_guard_bribe",
+  "seed": {
+    "skill.intimidation": 5,
+    "attr.charisma": 4,
+    "npc.alert_level": 1
+  },
+  "dice": [1, 1, 1, 1, 1, 1, 1, 2, 2],
+  "steps": [
+    { "expect_line": ["Corp Guard", "Halt. This floor's closed."] },
+    { "choose": "Back off or I put you through that wall." },
+    { "expect_line": ["Corp Guard", "Security! Intruder on three!"] },
+    { "expect_end": "end" },
+    {
+      "expect_store": {
+        "test.intimidation.hits": 0,
+        "test.intimidation.net": -3,
+        "test.intimidation.glitch": true,
+        "npc.alert_level": 2
+      },
+      "expect_clock": 3
+    }
+  ]
+}

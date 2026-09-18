@@ -1,0 +1,24 @@
+{
+  "_note": "Job type records. Required objective counts are NOT here: mission_graph.JOB_GRAPH owns them (1, 2, 1, 1) and world.md section 4 states the same numbers. Multipliers and Clock starts are DECISIONS section 16's JOB_TYPE_MULT and CLOCK_START. `extraction` is the canonical key; `paydata` is dialogue.md's name for it (section 16 aliases the two). Which types reach the board is campaign.OFFER_TYPES' - v1 offers extraction alone, which is what keeps Phase 1's slice Job always reachable.",
+  "types": {
+    "extraction": {
+      "name": "Extraction",
+      "act": "reach the vault node, take the Paydata device, and leave"
+    },
+    "sabotage": {
+      "name": "Sabotage",
+      "act": "destroy or disable both target devices, then leave"
+    },
+    "protection": {
+      "name": "Protection",
+      "act": "keep the VIP alive: escort to the exit, or hold the node"
+    },
+    "courier": {
+      "name": "Courier",
+      "act": "carry the package from entry to the drop node, then exit"
+    }
+  },
+  "aliases": {
+    "paydata": "extraction"
+  }
+}

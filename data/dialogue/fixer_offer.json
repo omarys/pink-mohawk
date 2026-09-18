@@ -1,0 +1,114 @@
+{
+  "_note": "dialogue.md section 8, authored verbatim. Hub context: no Clock effects are legal here (E33).",
+  "id": "fixer_offer",
+  "context": "hub",
+  "cast": { "fixer": "Fixer", "pc": "Runner" },
+  "pc": "pc",
+  "start": "open",
+  "vars": {
+    "met_fixer": false,
+    "haggle_used": false,
+    "fixer_refused": false
+  },
+  "nodes": [
+    { "id": "open", "goto": "intro" },
+
+    {
+      "id": "intro",
+      "speaker": "fixer",
+      "line": "You're the crew, then. Sit down.",
+      "effects": [ { "set": "flags.met_fixer", "value": true } ],
+      "goto": "gate_refusal"
+    },
+
+    { "id": "gate_refusal", "cond": "rep.fixer < 0", "then": "refusal", "else": "offer" },
+
+    {
+      "id": "refusal",
+      "speaker": "fixer",
+      "line": "You stiffed me on the Bellevue job. Find another Fixer.",
+      "effects": [ { "set": "flags.fixer_refused", "value": true } ],
+      "end": true
+    },
+
+    {
+      "id": "offer",
+      "speaker": "fixer",
+      "line": "Pay is 12k. In and out.",
+      "choices": [
+        { "text": "Who's the target?", "goto": "target_brief" },
+        {
+          "text": "The pay is 12k, the risk is 15k.",
+          "cond": "skill.negotiation >= 4 and flags.haggle_used == False",
+          "goto": "haggle",
+          "effects": [ { "set": "flags.haggle_used", "value": true } ]
+        },
+        { "text": "I'm in.", "goto": "accept" },
+        { "text": "Not interested.", "goto": "walk_away" }
+      ]
+    },
+
+    {
+      "id": "target_brief",
+      "speaker": "fixer",
+      "line": "Paydata. Sub-level three, vault at the end of the service corridor.",
+      "goto": "offer"
+    },
+
+    {
+      "id": "haggle",
+      "effects": [
+        { "test": { "key": "haggle", "skill": "negotiation", "attribute": "charisma",
+                    "opposed": { "pool": 4 } } }
+      ],
+      "goto": "haggle_result"
+    },
+
+    { "id": "haggle_result", "cond": "test.haggle.net >= 2", "then": "haggle_big", "else": "haggle_check" },
+    { "id": "haggle_check",  "cond": "test.haggle.net >= 1", "then": "haggle_small", "else": "haggle_no" },
+
+    {
+      "id": "haggle_big",
+      "speaker": "fixer",
+      "line": "You're pushing it. {job.payout_agreed:,}, and the deck comes back intact.",
+      "effects": [ { "set": "job.payout_agreed", "expr": "job.payout_base + 100 * test.haggle.net" } ],
+      "goto": "offer"
+    },
+
+    {
+      "id": "haggle_small",
+      "speaker": "fixer",
+      "line": "One bump. {job.payout_agreed:,}. Take it or leave it.",
+      "effects": [ { "set": "job.payout_agreed", "expr": "job.payout_base + 100 * test.haggle.net" } ],
+      "goto": "offer"
+    },
+
+    {
+      "id": "haggle_no",
+      "speaker": "fixer",
+      "line": "The number is the number. Don't waste my morning.",
+      "effects": [ { "change_rep": { "who": "fixer", "delta": -1 } } ],
+      "goto": "offer"
+    },
+
+    {
+      "id": "accept",
+      "effects": [ { "start_job": true } ],
+      "goto": "brief"
+    },
+
+    {
+      "id": "brief",
+      "speaker": "fixer",
+      "line": "Vault's on sub-level three, service corridor. Loud gets you dead.",
+      "end": true
+    },
+
+    {
+      "id": "walk_away",
+      "speaker": "fixer",
+      "line": "Your loss. The offer's dead by morning.",
+      "end": true
+    }
+  ]
+}
