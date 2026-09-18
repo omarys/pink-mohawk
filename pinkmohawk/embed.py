@@ -51,6 +51,8 @@ attempt is how one bad layout leaks into the next.
 
 from __future__ import annotations
 
+import random
+
 from dataclasses import dataclass, field
 from typing import Final
 
@@ -65,6 +67,7 @@ Coord = tuple[int, int]
 
 # --- generator parameters (docs/design/world.md §6) ------------------------------------------
 MAX_EMBED_ATTEMPTS: Final = 8  # [P16]
+CANDIDATE_LIMIT: Final = 16  # bounds the cut search so backtracking cannot blow up
 MIN_LEAF_EDGE: Final = 8  # §6.2 step 1
 WALL_MARGIN: Final = 1  # §6.2 step 3
 CORRIDOR_WIDTH: Final = 1  # DEC §10
@@ -141,65 +144,161 @@ class Site:
         return self.rooms[node_id]
 
 
+def _room_size(graph: MissionGraph, kind: str) -> tuple[int, int]:
+    """The vault's size depends on the Job, not just the node kind: a courier drop is a doorway."""
+    if kind == OBJECTIVE:
+        return OBJECTIVE_INTERIOR.get(graph.job_type or "", (10, 8))
+    return ROOM_INTERIOR[kind]
+
+
+def _ordered_nodes(graph: MissionGraph) -> list[int]:
+    """Entry first, exit last, side nodes beside their parent (depth = parent + 1)."""
+    depths = graph.depth()
+    return sorted(graph.nodes, key=lambda n: (depths[n], n))
+
+
+def _ordered_sizes(graph: MissionGraph) -> list[tuple[int, int]]:
+    return [_room_size(graph, graph.nodes[n].kind) for n in _ordered_nodes(graph)]
+
+
+def _feasible(sizes: list[tuple[int, int]], w: int, h: int) -> bool:
+    """
+    Necessary conditions for a subtree rect to host these rooms somewhere inside it.
+
+    Deliberately cheap and conservative: a room wider than the rect can never fit in any descendant,
+    and the rooms plus their margins need the area.
+    It prunes the cut search; the recursion decides the rest.
+    """
+    if not sizes:
+        return True
+    if max(s[0] for s in sizes) + 2 * WALL_MARGIN > w:
+        return False
+    if max(s[1] for s in sizes) + 2 * WALL_MARGIN > h:
+        return False
+    needed = sum((s[0] + 2 * WALL_MARGIN) * (s[1] + 2 * WALL_MARGIN) for s in sizes)
+    return needed <= w * h
+
+
+def _carve_interiors(site: Site) -> None:
+    """A fresh TileMap is ALL WALL, so rooms to be dug out before anything can walk in them."""
+    for room in site.rooms.values():
+        for x, y in room.cells:
+            site.map.tiles[site.map.idx(x, y)] = TILE_FLOOR
+
+
+def _finish(
+    graph: MissionGraph,
+    rooms: dict[int, Room],
+    width: int,
+    height: int,
+    rng,
+    attempts: int,
+    used_fallback: bool,
+) -> Site:
+    site = Site(
+        TileMap(width, height),
+        rooms,
+        (0, 0),
+        (0, 0),
+        attempts=attempts,
+        used_fallback=used_fallback,
+    )
+    _carve_interiors(site)
+    for parent, child in graph.edges():
+        carve_corridor(site, rooms[parent], rooms[child], rng)
+    site.spawn = rooms[graph.single(ENTRY)].center
+    site.exit_cell = rooms[graph.single(EXIT)].center
+    return site
+
+
+def _split(x: int, y: int, w: int, h: int, sizes: list[tuple[int, int]], rng):
+    """
+    Size-aware BSP. Returns a leaf per room, IN ROOM ORDER, or None if this rect cannot host them.
+
+    Splitting the ordered list in half and rectangle to match is what keeps the graph's order spatial:
+    leaves come back in the same sequence as `sizes`, so node i+1 is always in a leaf near node i.
+    That is the whole trick - a count-based splitter has no idea that the vault needs 16x12.
+    """
+    if len(sizes) == 1:
+        return [(x, y, w, h)] if _feasible(sizes, w, h) else None
+
+    k = len(sizes) // 2
+    left, right = sizes[:k], sizes[k:]
+    axes = ("h", "v") if w >= h else ("v", "h")  # try the longer side first
+
+    for axis in axes:
+        span = w if axis == "h" else h
+        if span < 2 * MIN_LEAF_EDGE:
+            continue
+        cuts = list(range(MIN_LEAF_EDGE, span - MIN_LEAF_EDGE + 1))
+        # Near-balanced cuts first, with a little jitter so layouts vary: a balanced split keeps
+        # leaves squarish, which keeps rooms off the map edge.
+        cuts.sort(key=lambda c: abs(c - span / 2) + rng.random() * 4)
+        for cut in cuts[:CANDIDATE_LIMIT]:
+            if axis == "h":
+                if not (_feasible(left, cut, h) and _feasible(right, w - cut, h)):
+                    continue
+                a = _split(x, y, cut, h, left, rng)
+                b = _split(x + cut, y, w - cut, h, right, rng)
+            else:
+                if not (_feasible(left, w, cut) and _feasible(right, w, h - cut)):
+                    continue
+                a = _split(x, y, w, cut, left, rng)
+                b = _split(x, y + cut, w, h - cut, right, rng)
+            if a is not None and b is not None:
+                return a + b
+    return None
+
+
 # ======================================================================================
 # YOURS: the generator
 # ======================================================================================
-def bsp_leaves(width: int, height: int, count, rng):
-    """One leaf per room, in room order, or None when the map cannot host them.
-
-    `sizes` is the ORDERED LIST of room interiors (entry first, exit last), not a count. A count is
-    not enough information: the splitter must know that one room is a 14x10 vault needing a 16x12
-    leaf once margins are included, or it will produce a 20x8 leaf and every attempt fails. A
-    count-based version of this function was written first and failed exactly that way.
-
-    Room order in, leaf order out. Returning leaves in the same sequence as `sizes` is what keeps
-    graph-adjacent nodes spatially adjacent, so no separate serpentine sort is needed.
-    """
-    if count() <= 1:
-        return [(0, 0, width, height)]
-    leaves = [(0, 0, width, height)]
-    # split the largest splittable leaf until we have count leaves
-    while len(leaves) < count:
-        # pick the leaf with the largest area that can be split
-        candidates = [
-            (i, r) for i, r in enumerate(leaves) if max(r[2], r[3]) >= 2 * MIN_LEAF_EDGE
-        ]
-        if not candidates:
-            break
-        i, r = max(candidates, key=lambda t: (t[1][2] * t[1][3], -t[0]))
-        x, y, w, h = r
-        axis = "h" if w >= h else "v"  # split the longer side
-        if axis == "h":  # split width
-            cut = rng.randint(MIN_LEAF_EDGE, w - MIN_LEAF_EDGE)
-            leaves[i : i + 1] = [(x, y, cut, h), (x + cut, y, w - cut, h)]
-        else:
-            cut = rng.randint(MIN_LEAF_EDGE, h - MIN_LEAF_EDGE)
-            leaves[i : i + 1] = [(x, y, w, cut), (x, y + cut, w, h - cut)]
-    return leaves
-    # raise NotImplementedError("implement bsp_leaves() — see the module docstring")
+def bsp_leaves(width: int, height: int, sizes, rng):
+    """One leaf per room, in room order, or None when the map cannot host them."""
+    return _split(0, 0, width, height, list(sizes), rng)
 
 
 def place_rooms(
-    graph: MissionGraph,
-    leaves: list[tuple[int, int, int, int]],
-    rng,
-    width: int = SITE_W,
-    height: int = SITE_H,
+    graph: MissionGraph, leaves, rng, width: int = SITE_W, height: int = SITE_H
 ) -> dict[int, Room]:
-    """One room per Mission Graph node, inside its leaf, sized by node type, never overlapping.
+    nodes = _ordered_nodes(graph)
+    if len(leaves) != len(nodes):
+        raise EmbedError(f"{len(leaves)} leaves for {len(nodes)} nodes")
+    rooms: dict[int, Room] = {}
+    for nid, (lx, ly, lw, lh) in zip(nodes, leaves):
+        rw, rh = _room_size(graph, graph.nodes[nid].kind)
+        if rw + 2 * WALL_MARGIN > lw or rh + 2 * WALL_MARGIN > lh:
+            raise EmbedError(f"node {nid} needs {rw}x{rh}, leaf is {lw}x{lh}")
+        # Random position inside the leaf, never touching the leaf's own edge.
+        # Rooms living in disjoint leaves with a margin each is why overlap is impossible rather than merely checked
+        # for: partition does the work
+        x = lx + rng.randint(WALL_MARGIN, lw - rw - WALL_MARGIN)
+        y = ly + rng.randint(WALL_MARGIN, lh - rh - WALL_MARGIN)
+        rooms[nid] = Room(nid, graph.nodes[nid].kind, x, y, rw, rh)
+    return rooms
 
-    `objective` sizes come from OBJECTIVE_INTERIOR[graph.job_type]. Nodes must be assigned to leaves
-    in graph-depth order (world.md §6.2 step 2) so graph-adjacent nodes are spatially adjacent.
-    """
-    raise NotImplementedError("implement place_rooms() — see the module docstring")
 
-
-def carve_corridor(site: Site, a: Room, b: Room, rng) -> set[Coord]:
+def carve_corridor(site: Site, a: Room, b: Room, rng) -> set[tuple[int, int]]:
     """Carve a 1-wide L-corridor between two room centres and open a doorway in each room's wall.
 
     Returns the cells carved. Overlapping corridors are absorbed, never widened.
     """
-    raise NotImplementedError("implement carve_corridor() — see the module docstring")
+    (ax, ay), (bx, by) = a.center, b.center
+    cells: set[tuple[int, int]] = set()
+    if rng.random() < 0.5:
+        cells |= {(x, ay) for x in range(min(ax, bx), max(ax, bx) + 1)}  # H then V
+        cells |= {(bx, y) for y in range(min(ay, by), max(ay, by) + 1)}
+    else:
+        cells |= {(ax, y) for y in range(min(ay, by), max(ay, by) + 1)}  # V then H
+        cells |= {(x, by) for x in range(min(ax, bx), max(ax, bx) + 1)}
+    for x, y in cells:
+        if site.map.in_bounds(x, y):
+            # 1 cell wide, and an overlap is simply abosrbed - never widened. Carving centre to
+            # centre is also what punches each room's doorway: the L has to cross both wall rings
+            # to get out of one room and into another
+            site.map.tiles[site.map.idx(x, y)] = TILE_FLOOR
+    site.carved |= cells
+    return cells
 
 
 def embed(
@@ -216,7 +315,25 @@ def embed(
     discarded whole. After `max_attempts` failures, return `spine_layout(...)` with
     `used_fallback=True` — the fallback is a bug report, not a design outcome.
     """
-    raise NotImplementedError("implement embed() — see the module docstring")
+    sizes = _ordered_sizes(graph)
+    for attempt in range(max_attempts):
+        # One derived stream per attempt: a retry is a different deterministic layout
+        # The whole sequence stays reproducible from the stored run_seed. never one RNG shared across attempts
+        rng = random.Random(derive(run_seed, f"gen.embed:{attempt}"))
+        leaves = bsp_leaves(width, height, sizes, rng)
+        if leaves is None:
+            continue
+        try:
+            rooms = place_rooms(graph, leaves, rng, width, height)
+        except EmbedError:
+            continue
+        site = _finish(graph, rooms, width, height, rng, attempt + 1, False)
+        if not verify(site, graph):
+            return site
+    # Fallback. Flagged, because a fallback that fires is a bug report, not a design outcome.
+    site = spine_layout(graph, width, height)  # may raise on impossible geometry
+    site.used_fallback = True
+    return site
 
 
 def spine_layout(
@@ -226,7 +343,48 @@ def spine_layout(
 
     Guaranteed connected by construction, and therefore cannot fail verification.
     """
-    raise NotImplementedError("implement spine_layout() — see the module docstring")
+    rng = random.Random(0)
+    ordered = _ordered_nodes(graph)
+    # Objectives go ON the spine, never in the side column. A Job with two objectives (sabotage)
+    # routes main_path() through only one of them; the other woudl land beside the entry in the side
+    # column, ~11 cells way horizontally, and break MIN_OBJECTIVE_DISTANCE.  Stacking every
+    # non-side node in the depth order puts each objective at least two rooms below the entry, which
+    # clears the rule by a wide margin
+    spine = [n for n in ordered if graph.nodes[n].kind != SIDE]
+    side = [n for n in ordered if graph.nodes[n].kind == SIDE]
+
+    rooms: dict[int, Room] = {}
+    # Vertical, not horizontal: the main path's rooms are wider than 60 once five separating walls
+    # are added, but their stacked hights fit.
+    cursor = WALL_MARGIN
+    for nid in spine:
+        rw, rh = _room_size(graph, graph.nodes[nid].kind)
+        if cursor + rh > height - WALL_MARGIN:
+            raise EmbedError(f"spine layout does not fit: node {nid} at y={cursor}")
+        rooms[nid] = Room(nid, graph.nodes[nid].kind, WALL_MARGIN, cursor, rw, rh)
+        cursor += rh + 1
+
+    # Side rooms in a second column, still beside their parent, so each correidor stays a short
+    # direct L. Nothing measured by verify() lives in this column.
+    right_x = (
+        WALL_MARGIN + max(_room_size(graph, graph.nodes[n].kind)[0] for n in spine) + 1
+    )
+    cursor = WALL_MARGIN
+    for nid in side:
+        rw, rh = _room_size(graph, graph.nodes[nid].kind)
+        if right_x + rw > width - WALL_MARGIN or cursor + rh > height - WALL_MARGIN:
+            raise EmbedError(f"spine layout does not fit: node {nid} at y={cursor}")
+        rooms[nid] = Room(nid, graph.nodes[nid].kind, right_x, cursor, rw, rh)
+        cursor += rh + 1
+
+    site = _finish(graph, rooms, width, height, rng, 0, True)
+    problems = verify(site, graph)
+    if problems:
+        # "Cannot fail" applies to connectivity, not to impossible geometry or the spacing rule.
+        raise EmbedError(f"spine layout failed verification: {problems[:3]}")
+    return site
+
+    # Side
 
 
 # ======================================================================================
