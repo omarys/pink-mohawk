@@ -605,6 +605,28 @@ carved and still blocked by a later room's wall. Both run, because they fail for
 
 ---
 
+### 6.4 What the first implementation taught (measured)
+
+Written after implementing §6.2, because three of these are invisible in the algorithm above.
+
+- **The splitter must receive the ordered room sizes, not a leaf count.** A count cannot know that one
+  of the rooms is a 14×10 vault needing a 16×12 leaf once margins are counted. Measured over 4 job
+  types × 12 seeds: a count-based splitter with `MIN_LEAF_EDGE = 8` produces a leaf too small for its
+  room on **25 of 48** graphs; at 10 or 12 it works but averages 1.40 and 1.04 attempts against 1.00
+  size-aware; at 16 it cannot produce 10 leaves at all, because 60×60 fits at most **9** leaves of
+  ≥16×16 — three columns of 16–20 leave a 12-wide strip that cannot be a leaf. So **no fixed minimum
+  leaf edge both guarantees a room fits and permits 10 leaves**, and the size-aware form is forced by
+  geometry rather than chosen for taste.
+- **Room order in, leaf order out.** Splitting the ordered room list in half *alongside* the rectangle
+  is what makes graph adjacency spatial adjacency. Sorting leaves afterwards by a serpentine heuristic
+  gives adjacency most of the time; deriving it from the list gives it every time.
+- **`MIN_LEAF_EDGE` is a floor, not a guarantee.** The binding constraint is `room + 2 × WALL_MARGIN`
+  per leaf, checked by the recursion, not by the constant.
+- **The fallback must satisfy every invariant `verify` checks, not connectivity alone.** Two objectives
+  (sabotage): `main_path()` routes through only one, the other landed 11 cells from the entry against a
+  minimum of 12, on all 12 sabotage seeds. "Cannot fail by construction" is a claim that has to *name*
+  the invariant it is about.
+
 ## 7. Site contents by node type
 
 Populated after embedding, from the `gen.place` stream. Placement order per node:

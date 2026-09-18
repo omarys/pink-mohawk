@@ -2,9 +2,9 @@
 
 DECISIONS §13 rows 3 and 4; rationale and complexity in docs/design/data-model.md §3, §4.
 
-THIS FILE IS A STUB. `chebyshev` is done; the four functions below it raise NotImplementedError.
-`demo()` is complete and is your acceptance test — it currently fails at the first call, which is
-the point: the checks exist before the implementation does.
+`chebyshev`, `neighbors`, `a_star`, `step_toward`, `flow_map` and `step_downhill` are all
+implemented. `demo()` is the acceptance test: optimality against a BFS oracle on 200 random
+maps, the corner rule, and gradient consistency over the flow field.
 
     .venv/bin/python -m pinkmohawk.pathfinding       # fails until you implement the four functions
 

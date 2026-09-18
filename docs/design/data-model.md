@@ -997,6 +997,24 @@ if __name__ == "__main__":
 
 ---
 
+### A conservative pruner is its own silent-failure class
+
+`embed._feasible` answers "could these rooms fit in a rectangle this size?" with conditions that are
+**necessary but not sufficient**. It exists to prune a cut search; the recursion's base case is the real
+check. That makes it a *pruner* rather than a *gate*, and the distinction has a consequence worth
+recording:
+
+**A pruner that answers the wrong question changes every layout and fails no correctness test.**
+Reintroducing a bug where the vertical split branch pruned against the horizontal geometry
+(`_feasible(left, cut, h)` instead of `_feasible(left, w, cut)`) passes the entire acceptance suite:
+0 fallbacks, 1.00 attempts, every invariant held. What changes is the product — 48 of 48 layouts differ
+and the mean entry-to-objective distance moves from 36.2 to 43.2.
+
+The general rule: **a helper that only steers a search needs a different test from one that decides an
+outcome.** Invariant assertions suit gates. Pruners want a *golden-value snapshot* — freeze the layout
+for a few seeds and assert it is unchanged — so that a change in search behaviour forces a conscious
+decision instead of slipping through as "still correct".
+
 ## 8. Behavior Tree — explicit-stack ticker, per-node cooldown counters
 
 *DECISIONS §13 row 8. Semantics: §8; rationale ADR-0009.*
