@@ -208,6 +208,10 @@ Weights are per-archetype parameters. Spirits are the only friendly actors with 
 - **Cooldowns key on the node's `name` when it has one, otherwise on its path.** An author who names two
   nodes `call_backup` shares one timer deliberately; unnamed nodes are independent.
 - **Repeat `times: 0` means one repetition per decision step**, not an unbounded loop.
+- **A FINITE `repeat` is atomic inside one decision step.** `times: N` resolves all N repetitions
+  and returns SUCCESS in a single tick, so a large N is precisely the spin `MAX_TICKS_PER_STEP`
+  guards against. Only `times: 0` spans steps, returning RUNNING once per step. The asymmetry is
+  not obvious and it is easy to write `times: 500` believing it holds for 500 steps.
 - **`MAX_TICKS_PER_STEP = 64`.** A `Repeat` whose condition never changes spins inside one decision step
   while spending no Energy, and the scheduler stalls with nothing to charge. Exceeding the cap raises a
   `BTLivelock` error naming the tree and the path, so a hang becomes a diagnosis.

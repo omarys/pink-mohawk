@@ -74,7 +74,7 @@ Every node is an object with `type`. `name` is optional on every node type; it i
 | `inverter` | `type`, `child` | `name` | `child`: exactly one node object |
 | `succeeder` | `type`, `child` | `name` | `child`: exactly one node object |
 | `cooldown` | `type`, `child`, `passes` | `name` | `child`: exactly one node object; `passes`: integer ≥ 1 |
-| `repeat` | `type`, `child`, `times` | `name` | `child`: exactly one node object; `times`: integer ≥ 0 (0 = forever, see §4.5) |
+| `repeat` | `type`, `child`, `times` | `name` | `child`: exactly one node object; `times`: integer ≥ 0 (0 = unbounded: one repetition per decision step, §4.5) |
 
 - `check` must be a key of the Condition catalogue (§8). `action` must be a key of the Action catalogue (§7).
 - `args` is an object whose keys are declared per condition/action; undeclared keys or wrong types are load errors.
@@ -200,7 +200,6 @@ class Frame:
 
 def tick(actor):
     actor.stack = [Frame(actor.root, "DESCEND", enter_index(actor.root), None)]
-    energy0 = actor.energy
 
     while actor.stack:
         f = actor.stack[-1]; n = f.node
@@ -278,7 +277,11 @@ def tick(actor):
                     else:
                         resume[n.id] = 0; f.idx = 0; f.status = None; f.phase = "DESCEND"
 
-    return actor.root_status, energy0 - actor.energy
+    # The ticker does NOT mutate Energy (DECISIONS §8, resolved item 25). It reports the cost the
+    # leaf declared through its tick context; the caller deducts it once, in run_pass above. An
+    # earlier draft returned `energy0 - actor.energy`, which double-charges once run_pass deducts
+    # `spent` as well.
+    return actor.root_status, actor.context.cost
 
 def deliver(actor, s):
     if not actor.stack: actor.root_status = s
