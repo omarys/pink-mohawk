@@ -99,6 +99,11 @@ Only the highest armor value applies; accessories add.
 - **Pass end threshold is 1 Energy** (`PASS_END_THRESHOLD = 1`). A Step costs 1, so a Pass runs until the actor cannot afford even one Step; then `Score −= 10` and a new Pass begins while the Score is still positive. An earlier draft said `≥ 5`, which contradicted the worked example in this same section and a two-to-three-Pass pacing target in `world.md`; both documents have since been corrected, and `data-model.md`'s constant now reads 1 as well.
 - Tie-break order: higher Reaction, then lower actor id. Deterministic, no re-rolls.
 
+**Diagonal Steps require at least one shared orthogonal cell to be passable** (no corner cutting). A
+body cannot slip through a seam that `fov` already treats as opaque, so vision and movement agree
+about corners. Enforced in `pathfinding.neighbors`; recorded here because one module enforces it and
+another assumes it.
+
 ## 6. Resources
 
 **Edge** (all classes, 3 points, refresh at the start of each Run)
@@ -281,7 +286,9 @@ highest in the game because a rifle line through its own squad must hold fire.
 Two stages, always in this order.
 
 1. **Mission Graph.** Typed nodes — entry, security, objective, side, exit — with edges constrained so that every objective is reachable from entry, exit is reachable from every objective, and side nodes hang off the main path without becoming required. Side branches become optional objectives and loot.
-2. **Embed.** Each node becomes a room sized by type (vault large, corridor 1-wide); edges become L-shaped corridors; connectivity is verified with union-find before the map is accepted. Devices, enemies, and loot are placed by node type, with the vault holding the paydata.
+2. **Embed.** Each node becomes a room sized by type (vault large, corridor 1-wide); edges become L-shaped corridors; connectivity is verified with union-find before the map is accepted. Devices, enemies, and loot are placed by node type, with the vault holding the paydata. A Site must also keep the nearest objective at least
+`MIN_OBJECTIVE_DISTANCE = 12` cells from the entry (Chebyshev, centre to centre) — the rule that stops
+the vault sitting next door to the entrance (ADR-0011's named failure mode).
 
 **`world.md` §5 owns the graph generator**: the per-Job `JOB_GRAPH` templates, the `sec_pre` and `sec_post` security nodes, and the ceilings — entry exactly 1, security 1–3 **in total** (at most 2 `sec_pre` plus 1 `sec_post`), objective 1–2, side 0–3 in chains no longer than 2, exit exactly 1 — which bound the graph at 10 nodes. (Read as "1–3 pre plus 1 post" the ceilings would sum to 11 and contradict their own stated bound; 
 security is 1–3 total.) `data-model.md` §6 previously described a simpler builder with no `job_type` argument and no `sec_post` nodes, and claimed `N ≤ 20`; that has since been rewritten to match.
@@ -376,7 +383,9 @@ Resolved since the first draft. Recorded because each resolution was a real choi
 27. **`MAX_TICKS_PER_STEP = 64`**; exceeding it raises `BTLivelock`.
 28. **`Repeat times: 0` = one repetition per decision step.**
 29. **Archetype weights and morale values adopted as unplaytested defaults** (`ai.md` §12 items 1–2 closed).
-30. **Self-targeted Heal is allowed** at the standard Drain. The geometry forces it — a TTF rasterises at an arbitrary size and fights the 16px grid, while Spleen's native height is exactly 16px so its glyph is a byte-for-byte paste into the left 8 columns of the cell. Cozette (MIT) stays the documented TTF alternative if the look ever changes; its vector build is upstream's own compatibility flag and is warned against at any size.
+30. **Self-targeted Heal is allowed** at the standard Drain.
+31. **No corner cutting**: a diagonal Step needs at least one shared orthogonal cell passable.
+32. **`MIN_OBJECTIVE_DISTANCE = 12`** (Chebyshev, centres): the `[P13]` value the docs left unstated. The geometry forces it — a TTF rasterises at an arbitrary size and fights the 16px grid, while Spleen's native height is exactly 16px so its glyph is a byte-for-byte paste into the left 8 columns of the cell. Cozette (MIT) stays the documented TTF alternative if the look ever changes; its vector build is upstream's own compatibility flag and is warned against at any size.
 
 Still open, and genuinely undecided:
 

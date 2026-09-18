@@ -12,7 +12,7 @@ included because the contract fixes those values and re-deriving them later is h
 
 from __future__ import annotations
 
-from typing import Final
+from typing import Final, TypedDict
 
 # ---------------------------------------------------------------------------
 # Geometry and rendering — DECISIONS §9, §12
@@ -254,8 +254,21 @@ HYSTERESIS_MAX: Final = 0.25
 # The cap turns that hang into a diagnosable error rather than a frozen scheduler.
 MAX_TICKS_PER_STEP: Final = 64
 
+
 # Unplaytested defaults from DECISIONS §8. None means the archetype has no such branch.
-ARCHETYPE_WEIGHTS: Final = {
+class ArchetypeWeightBlock(TypedDict):
+    """One archetype's §8 parameter block. `None` marks a branch that archetype does not have."""
+
+    w_threat: float
+    w_visible: float
+    w_objective: float
+    w_ally_risk: float
+    hysteresis: float
+    morale_bonus: int | None
+    flee_threshold: int | None
+
+
+ARCHETYPE_WEIGHTS: Final[dict[str, ArchetypeWeightBlock]] = {
     "corp_guard": {
         "w_threat": 1.0,
         "w_visible": 2.0,
