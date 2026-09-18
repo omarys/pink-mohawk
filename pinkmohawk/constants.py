@@ -254,6 +254,10 @@ HYSTERESIS_MAX: Final = 0.25
 # The cap turns that hang into a diagnosable error rather than a frozen scheduler.
 MAX_TICKS_PER_STEP: Final = 64
 
+# Earshot for the noise broadcast: a loud event reaches every actor within this Chebyshev radius,
+# walls ignored (DECISIONS §8, resolved item 34).
+NOISE_RADIUS: Final = 12
+
 
 # Unplaytested defaults from DECISIONS §8. None means the archetype has no such branch.
 class ArchetypeWeightBlock(TypedDict):

@@ -23,6 +23,8 @@ from __future__ import annotations
 from .constants import FOV_RADIUS, TILE_FLOOR
 from .grid import TileMap
 
+type Coord = tuple[int, int]  # fov and pathfinding each name their own; no shared module for it
+
 # Octant transforms, in Bergstrom's order. Each maps a local (dx, dy) into map space, which is
 # what lets one routine serve all eight octants. A wrong tuple mirrors exactly one octant and the
 # bug shows up in one direction only.
@@ -38,20 +40,24 @@ MULT: tuple[tuple[int, int, int, int], ...] = (
 )
 
 
-def _lit(m: TileMap, x: int, y: int) -> int:
-    """Mark a cell visible, returning 1 if it was newly lit. Bounds-guarded: idx(-1, y) aliases
-    the last column, so an unguarded write here would light the far edge of the map."""
+def _lit(m: TileMap, buf: bytearray, x: int, y: int) -> int:
+    """Mark a cell visible in `buf`, returning 1 if it was newly lit.
+
+    Bounds-guarded twice over: `idx(-1, y)` resolves from the end of a flat array, so an unguarded
+    write would silently light a cell on the far side of the map.
+    """
     if not m.in_bounds(x, y):
         return 0
     i = m.idx(x, y)
-    if m.visible[i]:
+    if buf[i]:
         return 0
-    m.visible[i] = 1
+    buf[i] = 1
     return 1
 
 
 def _cast(
     m: TileMap,
+    buf: bytearray,
     cx: int,
     cy: int,
     row: int,
@@ -87,7 +93,7 @@ def _cast(
                 break
 
             if dx * dx + dy * dy <= radius_sq:
-                lit += _lit(m, x, y)
+                lit += _lit(m, buf, x, y)
 
             if blocked:
                 if m.is_wall(x, y):
@@ -97,7 +103,7 @@ def _cast(
                 start = new_start
             elif m.is_wall(x, y) and j < radius:
                 blocked = True
-                lit += _cast(m, cx, cy, j + 1, start, l_slope, radius, xx, xy, yx, yy)
+                lit += _cast(m, buf, cx, cy, j + 1, start, l_slope, radius, xx, xy, yx, yy)
                 new_start = r_slope
 
         if blocked:  # the rest of this wedge is dark
@@ -106,18 +112,58 @@ def _cast(
     return lit
 
 
-def compute_fov(m: TileMap, cx: int, cy: int, radius: int = FOV_RADIUS) -> int:
-    """Rewrite m.visible from (cx, cy). Returns the number of cells lit (handy in tests).
+def compute_fov_into(m: TileMap, buf: bytearray, cx: int, cy: int, radius: int = FOV_RADIUS) -> int:
+    """Rewrite `buf` with what (cx, cy) can see. Returns the number of cells lit.
 
-    `explored` is deliberately untouched: Memory is folded in by TileMap.remember() once per turn.
+    `buf` is the caller's storage, not the map's. Each actor owns one (DECISIONS §8): the map's own
+    `visible` array is the renderer's view, so one shared array would mean every consumer tracking
+    whose eyes it currently holds.
     """
-    m.clear_visible()
+    if len(buf) != m.w * m.h:
+        raise ValueError(f"buffer is {len(buf)}, map is {m.w * m.h}")
+    buf[:] = b"\0" * len(buf)
     if not m.in_bounds(cx, cy):
         return 0
-    lit = _lit(m, cx, cy)
+    lit = _lit(m, buf, cx, cy)
     for xx, xy, yx, yy in MULT:
-        lit += _cast(m, cx, cy, 1, 1.0, 0.0, radius, xx, xy, yx, yy)
+        lit += _cast(m, buf, cx, cy, 1, 1.0, 0.0, radius, xx, xy, yx, yy)
     return lit
+
+
+def compute_fov(m: TileMap, cx: int, cy: int, radius: int = FOV_RADIUS) -> int:
+    """Compute into the map's own `visible` array: the renderer's view. See `compute_fov_into`."""
+    return compute_fov_into(m, m.visible, cx, cy, radius)
+
+
+def line_cells(a: Coord, b: Coord) -> list[Coord]:
+    """Bresenham line from `a` to `b`, both ends inclusive.
+
+    The firing line for `not_blocked_by_ally`, and the LOS test for cover. Deliberately separate
+    from shadowcasting: vision is a wedge, a shot is a line, and they are allowed to disagree.
+    """
+    (x0, y0), (x1, y1) = a, b
+    dx, dy = abs(x1 - x0), abs(y1 - y0)
+    sx = 1 if x0 < x1 else -1
+    sy = 1 if y0 < y1 else -1
+    err = dx - dy
+    cells: list[Coord] = []
+    while True:
+        cells.append((x0, y0))
+        if (x0, y0) == (x1, y1):
+            return cells
+        e2 = 2 * err
+        if e2 > -dy:
+            err -= dy
+            x0 += sx
+        if e2 < dx:
+            err += dx
+            y0 += sy
+
+
+def has_los(m: TileMap, a: Coord, b: Coord) -> bool:
+    """True when no wall lies strictly between `a` and `b`. Endpoints are not tested: they are
+    where the two actors stand, and an actor in a wall is a different bug."""
+    return not any(m.is_wall(x, y) for x, y in line_cells(a, b)[1:-1])
 
 
 # --------------------------------------------------------------------------------------
@@ -131,7 +177,7 @@ def _leaky_fov(m: TileMap, cx: int, cy: int, radius: int) -> int:
     for y in range(cy - radius, cy + radius + 1):
         for x in range(cx - radius, cx + radius + 1):
             if (x - cx) ** 2 + (y - cy) ** 2 <= radius * radius:
-                lit += _lit(m, x, y)
+                lit += _lit(m, m.visible, x, y)
     return lit
 
 
@@ -205,6 +251,31 @@ def demo() -> None:
     assert leak.visible[leak.idx(3, 5)] != o.visible[o.idx(3, 5)], (
         "the occlusion assertion must distinguish a correct FOV from a permissive one"
     )
+
+    # ---- per-actor buffers: the map's own visible array is untouched --------------------
+    before = bytes(m.visible)
+    mine = bytearray(m.w * m.h)
+    lit_mine = compute_fov_into(m, mine, 10, 10, 8)
+    assert sum(mine) == lit_mine == base, "same algorithm, different buffer, same answer"
+    assert bytes(m.visible) == before, "compute_fov_into must leave the map's own array alone"
+    try:
+        compute_fov_into(m, bytearray(4), 10, 10)
+        raise AssertionError("a wrongly sized buffer must be refused")
+    except ValueError:
+        pass
+
+    # ---- the firing line, and LOS as a separate idea from vision ------------------------
+    assert line_cells((0, 0), (3, 0)) == [(0, 0), (1, 0), (2, 0), (3, 0)]
+    assert line_cells((0, 0), (2, 2)) == [(0, 0), (1, 1), (2, 2)]
+    assert line_cells((3, 3), (3, 3)) == [(3, 3)]
+    clear = _open_map(9, 9)
+    assert has_los(clear, (0, 4), (8, 4))
+    walled = _open_map(9, 9)
+    walled.tiles[walled.idx(4, 4)] = 0
+    assert not has_los(walled, (0, 4), (8, 4)), "a wall between them blocks the line"
+    assert has_los(walled, (4, 4), (4, 4)), "a wall is not between a cell and itself"
+    assert not has_los(walled, (3, 4), (5, 4)), "the wall is strictly between the two ends"
+    assert has_los(walled, (4, 4), (6, 4)), "an endpoint holding a wall does not block its own line"
 
     print(
         f"OK  compute_fov: open ground R=8 -> {base} cells, pillar -> {with_pillar} "

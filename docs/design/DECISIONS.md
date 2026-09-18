@@ -213,6 +213,20 @@ Weights are per-archetype parameters. Spirits are the only friendly actors with 
 - **Cooldowns key on the node's `name` when it has one, otherwise on its path.** An author who names two
   nodes `call_backup` shares one timer deliberately; unnamed nodes are independent.
 - **Repeat `times: 0` means one repetition per decision step**, not an unbounded loop.
+- **Each actor owns its own visibility buffer** (`bytearray`, one per actor). `refresh()` fills it
+  with `fov.compute_fov_into`; the map's own `visible` array is the renderer's view and nothing else
+  writes it. One shared array would mean every consumer tracking whose eyes it currently holds, and
+  the failure is silent — an enemy seeing through the player's FOV, or the renderer drawing a guard's.
+- **Earshot is a Chebyshev radius of 12 cells, walls ignored.** Loud events broadcast their cell to
+  every actor in range; gunfire carrying through a wall is accepted, and the event carries its cause
+  so per-cause radii stay a one-table change.
+- **`not_blocked_by_ally` is tested on the firing line**: a living ally standing on any Bresenham
+  cell between the actor and the target (endpoints excluded) blocks the shot. This is the reading
+  §6.2's worked example uses, and it keeps a guard willing to shoot past a friend's shoulder.
+- **`seek_cover` picks the nearest cell that breaks line of sight from `target`** and is reachable,
+  ties broken by lower `y` then lower `x`. One deterministic rule, no new structures; it ignores the
+  other Runners, which is the accepted cost in v1.
+
 - **A FINITE `repeat` is atomic inside one decision step.** `times: N` resolves all N repetitions
   and returns SUCCESS in a single tick, so a large N is precisely the spin `MAX_TICKS_PER_STEP`
   guards against. Only `times: 0` spans steps, returning RUNNING once per step. The asymmetry is
@@ -385,7 +399,11 @@ Resolved since the first draft. Recorded because each resolution was a real choi
 29. **Archetype weights and morale values adopted as unplaytested defaults** (`ai.md` §12 items 1–2 closed).
 30. **Self-targeted Heal is allowed** at the standard Drain.
 31. **No corner cutting**: a diagonal Step needs at least one shared orthogonal cell passable.
-32. **`MIN_OBJECTIVE_DISTANCE = 12`** (Chebyshev, centres): the `[P13]` value the docs left unstated. The geometry forces it — a TTF rasterises at an arbitrary size and fights the 16px grid, while Spleen's native height is exactly 16px so its glyph is a byte-for-byte paste into the left 8 columns of the cell. Cozette (MIT) stays the documented TTF alternative if the look ever changes; its vector build is upstream's own compatibility flag and is warned against at any size.
+32. **`MIN_OBJECTIVE_DISTANCE = 12`** (Chebyshev, centres): the `[P13]` value the docs left unstated.
+33. **Per-actor visibility buffers**; the map's `visible` belongs to the renderer alone.
+34. **`NOISE_RADIUS = 12`**, walls ignored — the earshot rule `noise_pos` needed.
+35. **Ally-blocking is tested on the Bresenham firing line**, endpoints excluded.
+36. **`seek_cover` takes the nearest LOS-breaking reachable cell**, ties by `(y, x)`. The geometry forces it — a TTF rasterises at an arbitrary size and fights the 16px grid, while Spleen's native height is exactly 16px so its glyph is a byte-for-byte paste into the left 8 columns of the cell. Cozette (MIT) stays the documented TTF alternative if the look ever changes; its vector build is upstream's own compatibility flag and is warned against at any size.
 
 Still open, and genuinely undecided:
 
