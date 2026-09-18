@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import pathlib
 import random
-from typing import Any
+from typing import Any, Protocol
 
 from .ai import load_trees
 from .bt import BTState
@@ -143,6 +143,43 @@ def build_runner(klass: str, actor_id: int, pos: tuple[int, int]) -> Actor:
         bb=Blackboard(),
         energy=0,
     )
+
+
+class SheetLike(Protocol):
+    """What `build_runner_from_sheet` needs of a `campaign.RunnerSheet`.
+
+    A Protocol rather than an import because `campaign` imports this module: the dependency runs one
+    way, exactly as the layer law wants, and the sheet still gets checked at the call site.
+    """
+
+    klass: str
+    attributes: dict[str, int]
+    skills: dict[str, int]
+    edge: int
+    loadout: list[str]
+    physical: int
+    stun: int
+    perks: list[Any]
+
+
+def build_runner_from_sheet(sheet: SheetLike, actor_id: int, pos: tuple[int, int]) -> Actor:
+    """A Runner built from the campaign's persisted sheet (world.md §10.1).
+
+    This is what makes a Hub purchase visible in a Run: `build_runner` supplies the class's opening
+    numbers, and the sheet then overrides every number a campaign can have changed - attributes,
+    skills, Edge, the loadout, and the filled monitor boxes §10.3 carries between Jobs.
+    """
+    actor = build_runner(sheet.klass, actor_id, pos)
+    role = actor.role
+    assert isinstance(role, RunnerRole), "build_runner returns a Runner"
+    actor.attrs.update(sheet.attributes)
+    actor.skills.update(sheet.skills)
+    role.edge = sheet.edge
+    role.inventory = [ItemRef(slug) for slug in sheet.loadout]
+    role.perks = [perk.id for perk in sheet.perks]
+    actor.physical.filled = sheet.physical
+    actor.stun.filled = sheet.stun
+    return actor
 
 
 def build_spirit(summoner_id: int, spirit_type: str, actor_id: int, pos: tuple[int, int]) -> Actor:

@@ -343,6 +343,16 @@ class Variable:
     raise_only: bool = False
     value: Any = None
 
+    @property
+    def type(self) -> Any:
+        """dialogue.md §5.2's word for this field, so a Variable duck-types as dialogue.VarSpec.
+
+        The engine's store protocol reads `spec(key).type` and this class was written with `kind`;
+        the two lanes built their halves from the same document and still disagreed on one word,
+        which is what three modules coded against prose produces. An alias is cheaper than a rename.
+        """
+        return self.kind
+
 
 @dataclass(frozen=True, slots=True)
 class Snapshot:
@@ -416,6 +426,15 @@ class CampaignState:
             raise_only=raise_only,
             value=default,
         )
+
+    def spec(self, key: str) -> Variable | None:
+        """dialogue.md §5.2's `spec(key)`: the declaration behind a key, or None if undeclared.
+
+        Read by the engine's effect applier for its write-type check. Adding it was part of wiring
+        the two halves: the dialogue lane programmed against the protocol, and the store arrived
+        without the method the protocol names.
+        """
+        return self._vars.get(key)
 
     def get(self, key: str) -> Any:
         """§5.2: an undeclared key is an error, never a quiet default."""

@@ -25,11 +25,23 @@ from dataclasses import dataclass, field, fields
 from typing import Any, Final
 
 from .bt import BTState
-from .constants import ATTRIBUTES, SKILLS
+from .constants import ATTRIBUTES, SKILLS, WOUND_PENALTY_PER_BOXES
 from .errors import ValidationError
 from .utility import Weights
 
 type Coord = tuple[int, int]
+
+
+def wound_modifier_from_boxes(physical: int, stun: int) -> int:
+    """§4's wound modifier from filled boxes alone.
+
+    Here rather than on `Actor` because two things need it and one of them has no Actor: a Runner at
+    the Hub is a persisted sheet, and the Dialogue Graph's `pool_bonus` asks for this while nobody is
+    spawned. It was a literal `// 3` in four places before the review, then one in `ai.py`, then here -
+    so the number now has exactly one home and the reviewer's finding cannot come back as prose.
+    """
+    return -((physical + stun) // WOUND_PENALTY_PER_BOXES)
+
 
 FACTIONS: Final = ("crew", "security", "spirit", "neutral")
 CLASSES: Final = ("adept", "mage", "shaman", "decker")
@@ -239,7 +251,7 @@ class Actor:
     @property
     def wound_modifier(self) -> int:
         """§4: −1 die per 3 filled boxes, counting both tracks together."""
-        return -((self.physical.filled + self.stun.filled) // 3)
+        return wound_modifier_from_boxes(self.physical.filled, self.stun.filled)
 
     @property
     def is_player_controlled(self) -> bool:

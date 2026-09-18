@@ -19,6 +19,7 @@ Layer 3. It imports `ai` for the tree tick, `content` for stat blocks, `security
 from __future__ import annotations
 
 import random
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -50,6 +51,9 @@ class RunState:
     _pass_seen: dict[int, int] = field(default_factory=dict)
     extraction: Extraction | None = None
     finished: bool = False
+    heat: int = (
+        0  # the campaign's Heat on entry, so `extract` prices the delta against the right base
+    )
 
     # -- queries ---------------------------------------------------------------------------
     @property
@@ -79,8 +83,23 @@ class RunState:
         return any(a.pos == cell for a in self.live_crew())
 
 
-def build_run(job_type: str, run_seed: int, *, heat: int = 0) -> RunState:
-    """Graph, Site, population, crew — from one stored seed (DECISIONS §9, §10)."""
+def build_run(
+    job_type: str,
+    run_seed: int,
+    *,
+    heat: int = 0,
+    clock_credit: int = 0,
+    roster: Sequence[Any] | None = None,
+) -> RunState:
+    """Graph, Site, population, crew - from one stored seed (DECISIONS 9, 10).
+
+    `roster` is the campaign's four Runner sheets, and passing it is what makes a bought weapon
+    visible in a Run: without it the crew is built from `CREW_CLASSES` and the opening sheets, which
+    is the Phase 1 behaviour a bare `build_run(job, seed)` still gets.
+
+    `clock_credit` is the Fixer Favour's head start (world.md 3.3): the Clock begins that many
+    segments further from convergence, so `remaining` reads CLOCK_SEGMENTS + credit.
+    """
     rngs = rng_mod.make_static_rngs(run_seed)
     graph = mission_graph.build_graph(job_type, rngs["gen.graph"])
     site = embed.embed(graph, run_seed)
@@ -90,9 +109,17 @@ def build_run(job_type: str, run_seed: int, *, heat: int = 0) -> RunState:
     crew: list[Actor] = []
     entry_room = site.rooms[graph.single(mission_graph.ENTRY)]
     entry_cells = entry_room.cells
-    for index, klass in enumerate(CREW_CLASSES):
-        # The crew spawns on the entry room's interior, one cell each, deterministically.
-        crew.append(content.build_runner(klass, index + 1, entry_cells[index * 2]))
+    # The crew spawns on the entry room's interior, one cell each, deterministically.
+    if roster is None:
+        crew = [
+            content.build_runner(klass, index + 1, entry_cells[index * 2])
+            for index, klass in enumerate(CREW_CLASSES)
+        ]
+    else:
+        crew = [
+            content.build_runner_from_sheet(sheet, index + 1, entry_cells[index * 2])
+            for index, sheet in enumerate(roster)
+        ]
     site.spawn = crew[0].pos
     site.map.remember()
 
@@ -133,8 +160,23 @@ def build_run(job_type: str, run_seed: int, *, heat: int = 0) -> RunState:
     for actor in actors:
         actor.allocate_visibility(site.map.w * site.map.h)
 
+    if clock_credit:
+        # A Favour's head start (world.md 3.3): the Clock starts behind, so convergence is that much
+        # further away. `remaining` reports it, and every threshold is a >= test, so nothing else
+        # needs to know.
+        world.clock.segments -= clock_credit
+
     run = RunState(
-        job_type, run_seed, graph, site, population, world, queue=None, rngs=rngs, crew=crew
+        job_type,
+        run_seed,
+        graph,
+        site,
+        population,
+        world,
+        queue=None,
+        rngs=rngs,
+        crew=crew,
+        heat=heat,
     )
     begin_round(run)
     return run
@@ -329,7 +371,7 @@ def extract(run: RunState, *, voluntary: bool = True, net_negotiation_hits: int 
         net_negotiation_hits=net_negotiation_hits,
         objectives_completed=completed,
         objectives_total=total,
-        heat=0,
+        heat=run.heat,
         voluntary=voluntary,
     )
     run.extraction = result
