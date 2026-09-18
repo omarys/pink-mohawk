@@ -20,10 +20,16 @@ target-version = "py314"
 extend-exclude = ["spike", ".agents", ".claude", "assets"]
 
 [tool.ruff.lint]
+# C420 is adopted: a comprehension over an iterable says dict.fromkeys in one call.
+# C408 is not: it wants the kwargs-style dict(...) in entities.py's test fixture rewritten
+# as a literal, which is a preference and reads worse there.
+# ARG is deliberately NOT adopted. Its 51 hits are all the same thing - ai.py's action handlers share
+# one signature and most ignore `world` or `args`, which is the registry working as designed, not
+# dead parameters. Renaming them `_world` would silence the rule without adding information.
 # E/F are ruff's defaults (pycodestyle errors + pyflakes). The rest are the rules worth having on
 # a codebase that is meant to be read: I sorts imports, UP modernises to the target version, B is
 # bugbear's bug patterns, SIM catches code that is more complicated than it needs to be.
-select = ["E", "F", "I", "UP", "B", "SIM"]
+select = ["E", "F", "I", "UP", "B", "SIM", "C420"]
 # E501 is line length, which the formatter owns; ruff's formatter and this linter would otherwise
 # fight over the same lines.
 ignore = ["E501"]

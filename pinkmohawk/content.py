@@ -76,7 +76,7 @@ def build_enemy(spawn: Spawn, actor_id: int, rng: random.Random) -> Actor:
     block = ENEMIES.get(spawn.template)
     if block is None:
         raise ValidationError([f"no stat block for {spawn.template!r}"])
-    attrs = {name: 3 for name in ATTRIBUTES}
+    attrs = dict.fromkeys(ATTRIBUTES, 3)
     attrs.update(block["attrs"])
     skills = dict.fromkeys(SKILLS, int(block["skills"]))
     physical, stun = _monitors()
@@ -113,7 +113,7 @@ def build_runner(klass: str, actor_id: int, pos: tuple[int, int]) -> Actor:
     block = CREW.get(klass)
     if block is None:
         raise ValidationError([f"no crew block for {klass!r}"])
-    attrs = {name: 3 for name in ATTRIBUTES}
+    attrs = dict.fromkeys(ATTRIBUTES, 3)
     attrs.update(block["attrs"])
     skills = dict.fromkeys(SKILLS, 3)
     skills.update(block["skills"])
@@ -147,7 +147,7 @@ def build_runner(klass: str, actor_id: int, pos: tuple[int, int]) -> Actor:
 
 def build_spirit(summoner_id: int, spirit_type: str, actor_id: int, pos: tuple[int, int]) -> Actor:
     """A conjured Spirit: a full Actor with its own tree (ai.md §8, `spirit`)."""
-    attrs = {name: 4 for name in ATTRIBUTES}
+    attrs = dict.fromkeys(ATTRIBUTES, 4)
     physical, stun = _monitors()
     return Actor(
         id=actor_id,

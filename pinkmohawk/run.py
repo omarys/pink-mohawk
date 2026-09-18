@@ -22,7 +22,7 @@ import random
 from dataclasses import dataclass, field
 from typing import Any
 
-from . import ai, bt, content, embed, mission_graph, placement, scheduler, security
+from . import ai, bt, content, embed, entities, mission_graph, placement, scheduler, security
 from . import rng as rng_mod
 from .constants import FOV_RADIUS, PASS_END_THRESHOLD
 from .entities import Actor
@@ -392,14 +392,19 @@ def demo() -> None:
 
     # ---- 6. gunfire ticks the Clock and a silent action does not -------------------------
     clock_before = run.clock.segments
-    shooter = next(a for a in run.enemies() if content.ENEMIES[a.role.archetype]["magazine"])  # type: ignore[union-attr]
+    shooter = next(
+        a
+        for a in run.enemies()
+        if isinstance(a.role, entities.EnemyRole) and content.ENEMIES[a.role.archetype]["magazine"]
+    )
+    assert isinstance(shooter.role, entities.EnemyRole), "an enemy that fired carries an EnemyRole"
     shooter.pos = (run.crew[0].pos[0] + 1, run.crew[0].pos[1])  # in range, or the attack fails
     assert shooter.bb is not None
     shooter.bb.target = run.crew[0].id
     shooter.energy = 12
     ai.ACTION_HANDLERS["attack_target"](
         shooter,
-        {"weapon": content.ENEMIES[shooter.role.archetype]["weapon"]},  # type: ignore[union-attr]
+        {"weapon": content.ENEMIES[shooter.role.archetype]["weapon"]},
         bt.TickContext(shooter),
         run.world,
     )

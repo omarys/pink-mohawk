@@ -181,7 +181,7 @@ class MissionGraph:
     def depth(self) -> dict[int, int]:
         """Node id -> longest distance from entry, in edges. Longest, because a merge must sit
         after every branch that feeds it."""
-        order = {n: 0 for n in self.nodes}
+        order = dict.fromkeys(self.nodes, 0)
         for _ in range(len(self.nodes)):  # DAG + ids in topological-ish order
             changed = False
             for n, node in self.nodes.items():
