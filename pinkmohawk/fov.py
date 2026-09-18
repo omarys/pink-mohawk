@@ -27,8 +27,14 @@ from .grid import TileMap
 # what lets one routine serve all eight octants. A wrong tuple mirrors exactly one octant and the
 # bug shows up in one direction only.
 MULT: tuple[tuple[int, int, int, int], ...] = (
-    (1, 0, 0, 1), (0, 1, 1, 0), (0, -1, 1, 0), (-1, 0, 0, 1),
-    (-1, 0, 0, -1), (0, -1, -1, 0), (0, 1, -1, 0), (1, 0, 0, -1),
+    (1, 0, 0, 1),
+    (0, 1, 1, 0),
+    (0, -1, 1, 0),
+    (-1, 0, 0, 1),
+    (-1, 0, 0, -1),
+    (0, -1, -1, 0),
+    (0, 1, -1, 0),
+    (1, 0, 0, -1),
 )
 
 
@@ -44,10 +50,21 @@ def _lit(m: TileMap, x: int, y: int) -> int:
     return 1
 
 
-def _cast(m: TileMap, cx: int, cy: int, row: int, start: float, end: float, radius: int,
-          xx: int, xy: int, yx: int, yy: int) -> int:
+def _cast(
+    m: TileMap,
+    cx: int,
+    cy: int,
+    row: int,
+    start: float,
+    end: float,
+    radius: int,
+    xx: int,
+    xy: int,
+    yx: int,
+    yy: int,
+) -> int:
     """Walk one octant outward, recursing into the wedge left past each wall. Returns cells lit."""
-    if start < end:                     # wedge is fully shadowed
+    if start < end:  # wedge is fully shadowed
         return 0
 
     radius_sq = radius * radius
@@ -64,9 +81,9 @@ def _cast(m: TileMap, cx: int, cy: int, row: int, start: float, end: float, radi
             l_slope = (dx - 0.5) / (dy + 0.5)
             r_slope = (dx + 0.5) / (dy - 0.5)
 
-            if start < r_slope:         # left of the lit range
+            if start < r_slope:  # left of the lit range
                 continue
-            if end > l_slope:           # right of the lit range
+            if end > l_slope:  # right of the lit range
                 break
 
             if dx * dx + dy * dy <= radius_sq:
@@ -74,16 +91,16 @@ def _cast(m: TileMap, cx: int, cy: int, row: int, start: float, end: float, radi
 
             if blocked:
                 if m.is_wall(x, y):
-                    new_start = r_slope     # still inside the wall: keep narrowing
+                    new_start = r_slope  # still inside the wall: keep narrowing
                     continue
-                blocked = False             # emerged: resume the wider range
+                blocked = False  # emerged: resume the wider range
                 start = new_start
             elif m.is_wall(x, y) and j < radius:
                 blocked = True
                 lit += _cast(m, cx, cy, j + 1, start, l_slope, radius, xx, xy, yx, yy)
                 new_start = r_slope
 
-        if blocked:                     # the rest of this wedge is dark
+        if blocked:  # the rest of this wedge is dark
             break
 
     return lit
@@ -142,7 +159,7 @@ def demo() -> None:
 
     # ---- walls are lit, and a pillar removes cells (differential, so no slope guessing) -----
     p = _open_map(21, 21)
-    p.tiles[p.idx(11, 11)] = 0        # one pillar, diagonally adjacent to the viewer
+    p.tiles[p.idx(11, 11)] = 0  # one pillar, diagonally adjacent to the viewer
     with_pillar = compute_fov(p, 10, 10, 8)
     assert p.visible[p.idx(11, 11)] == 1, "a wall in view must be lit: the renderer needs it"
     assert with_pillar < base, "a pillar must occlude something"
@@ -158,8 +175,9 @@ def demo() -> None:
     e = _open_map(11, 11)
     compute_fov(e, 0, 5, 8)
     assert e.visible[e.idx(0, 5)] == 1
-    assert all(e.visible[e.idx(10, y)] == 0 for y in range(11)), \
+    assert all(e.visible[e.idx(10, y)] == 0 for y in range(11)), (
         "the far edge was lit: an out-of-bounds write wrapped via idx(-1, y)"
+    )
 
     # ---- recomputing clears the previous result, and never touches Memory -------------------
     r = _open_map(11, 11)
@@ -184,11 +202,14 @@ def demo() -> None:
     leak.tiles[leak.idx(2, 5)] = 0
     _leaky_fov(leak, 1, 5, 8)
     assert leak.visible[leak.idx(3, 5)] == 1, "sanity: the leaky reference does leak"
-    assert leak.visible[leak.idx(3, 5)] != o.visible[o.idx(3, 5)], \
+    assert leak.visible[leak.idx(3, 5)] != o.visible[o.idx(3, 5)], (
         "the occlusion assertion must distinguish a correct FOV from a permissive one"
+    )
 
-    print(f"OK  compute_fov: open ground R=8 -> {base} cells, pillar -> {with_pillar} "
-          f"(occludes {base - with_pillar}), diagonal pair occludes {open_count - closed_count}")
+    print(
+        f"OK  compute_fov: open ground R=8 -> {base} cells, pillar -> {with_pillar} "
+        f"(occludes {base - with_pillar}), diagonal pair occludes {open_count - closed_count}"
+    )
 
 
 if __name__ == "__main__":

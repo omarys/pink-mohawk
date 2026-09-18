@@ -1,0 +1,11 @@
+# Tool versions for this project, pinned so the repo is reproducible on any machine.
+#
+# Why this file exists: mise had `black` installed but nothing pinned it in this directory, so the
+# shim failed with "No version is set for shim: black" — which is confusing when you have just been
+# running black by hand. Pinning python, ruff and black here makes all three resolve from the repo
+# root, and keeps them out of the venv.
+
+[tools]
+python = "3.14.7"
+ruff = "0.16.7"
+black = "26.5.1"

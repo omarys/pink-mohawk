@@ -1,0 +1,64 @@
+# Tool configuration only.
+#
+# This is a game, not a distributed library, so there is no [project] table and no build backend:
+# `pinkmohawk/` is imported from the repository root and never installed. If that changes, add
+# [project] + [build-system] plus a wheel target that names the package, or hatchling will sweep
+# `assets/` (2.6MB of art) into the distribution.
+#
+# The venv holds the runtime dependencies and mypy:
+#
+#     python3 -m venv .venv
+#     uv pip install --python .venv/bin/python tcod numpy mypy
+#
+# Python, ruff and black deliberately do NOT live in the venv — they come from mise (see mise.toml),
+# so there is one copy of each on the machine and the venv stays about the game.
+
+[tool.ruff]
+line-length = 100
+target-version = "py314"
+# Vendored art and the throwaway Phase 0 spike are not ours to lint.
+extend-exclude = ["spike", ".agents", ".claude", "assets"]
+
+[tool.ruff.lint]
+# E/F are ruff's defaults (pycodestyle errors + pyflakes). The rest are the rules worth having on
+# a codebase that is meant to be read: I sorts imports, UP modernises to the target version, B is
+# bugbear's bug patterns, SIM catches code that is more complicated than it needs to be.
+select = ["E", "F", "I", "UP", "B", "SIM"]
+# E501 is line length, which the formatter owns; ruff's formatter and this linter would otherwise
+# fight over the same lines.
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.black]
+# NOT the formatter for this repository. Recorded here only so that anyone who reaches for black
+# gets the same line length.
+#
+# Evidence, so nobody re-litigates it: with both tools configured to 100, black and ruff format
+# disagree on 9 of 14 files. Black also does not pick up this table in this environment - passing
+# `--line-length 100` on the command line changes its output, but the config alone does not, and it
+# reports running under Python 3.13 while this project targets 3.14.
+#
+# One formatter, one config, one command:
+#
+#     ruff format pinkmohawk tools     # write
+#     ruff format --check pinkmohawk tools
+#
+# `pinkmohawk/constants.py` is exempt from formatting with an inline `# fmt: off` block: its columns
+# of DECISIONS references are a contract table, not decoration.
+line-length = 100
+target-version = ["py314"]
+
+[tool.mypy]
+python_version = "3.14"
+files = ["pinkmohawk", "tools"]
+# Not `strict = true` yet: the point is to keep the code honest, not to spend an afternoon on
+# annotations for the check-* tools. These four settings catch the errors that matter.
+check_untyped_defs = true
+no_implicit_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+# tcod and numpy are only imported by the Phase 0 spike, which the layer law keeps out of
+# `pinkmohawk/`; if that ever changes, add the stub packages here rather than muting the check.
+ignore_missing_imports = false

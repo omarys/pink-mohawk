@@ -29,21 +29,23 @@ import sys
 from typing import Final
 
 # The streams that exist in v1. Adding one means adding it here, so the set stays enumerable.
-STATIC_STREAMS: Final = frozenset({
-    "gen.graph",
-    "gen.embed",
-    "gen.place",
-    "rules.initiative",
-    "rules.combat",
-    "loot",
-})
+STATIC_STREAMS: Final = frozenset(
+    {
+        "gen.graph",
+        "gen.embed",
+        "gen.place",
+        "rules.initiative",
+        "rules.combat",
+        "loot",
+    }
+)
 
 _DIGEST_BYTES: Final = 8  # 64 bits, comfortably inside a Random seed
 
 
 def derive(seed: int, name: str) -> int:
     """Return a deterministic 64-bit integer for (seed, name). Never uses hash()."""
-    material = f"{seed}:{name}".encode("utf-8")
+    material = f"{seed}:{name}".encode()
     return int.from_bytes(hashlib.sha256(material).digest()[:_DIGEST_BYTES], "big")
 
 
@@ -102,9 +104,13 @@ def demo() -> None:
     )
     outputs = set()
     for hashseed in ("0", "1", "random"):
-        done = subprocess.run([sys.executable, "-c", probe],
-                              capture_output=True, text=True, check=True,
-                              env={"PYTHONHASHSEED": hashseed, "PATH": "", "PYTHONPATH": "."})
+        done = subprocess.run(
+            [sys.executable, "-c", probe],
+            capture_output=True,
+            text=True,
+            check=True,
+            env={"PYTHONHASHSEED": hashseed, "PATH": "", "PYTHONPATH": "."},
+        )
         outputs.add(done.stdout.strip())
     assert len(outputs) == 1, f"seed derivation is not process-stable: {outputs}"
 
@@ -112,8 +118,10 @@ def demo() -> None:
     assert set(r) == set(STATIC_STREAMS), "registry mismatch"
     assert r["loot"].random() != r["gen.graph"].random(), "streams are not independent"
 
-    print(f"OK  derive() stable across PYTHONHASHSEED {sorted(outputs)[0]!r}; "
-          f"{len(STATIC_STREAMS)} static streams")
+    print(
+        f"OK  derive() stable across PYTHONHASHSEED {sorted(outputs)[0]!r}; "
+        f"{len(STATIC_STREAMS)} static streams"
+    )
 
 
 if __name__ == "__main__":

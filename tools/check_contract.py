@@ -36,7 +36,7 @@ def table_after(md: str, header: str) -> list[list[str]]:
             if rows:
                 break
             continue
-        if set(s) <= set("|-: "):          # the |---|---| separator
+        if set(s) <= set("|-: "):  # the |---|---| separator
             continue
         rows.append([c.strip() for c in s.strip("|").split("|")])
     return rows
@@ -60,7 +60,9 @@ def expect(where: str, label: str, doc_value: object, code_value: object) -> Non
     global checked
     checked += 1
     if doc_value != code_value:
-        problems.append(f"{where}: {label}: DECISIONS says {doc_value!r}, constants says {code_value!r}")
+        problems.append(
+            f"{where}: {label}: DECISIONS says {doc_value!r}, constants says {code_value!r}"
+        )
 
 
 def check_clock(md: str, C) -> None:
@@ -90,9 +92,9 @@ def check_weapons(md: str, C) -> None:
         if k not in C.WEAPONS:
             continue
         dv, code, ap, _range = C.WEAPONS[k]
-        expect("weapon AP", k, leading_int(cells[2]), ap)          # AP is always an integer
+        expect("weapon AP", k, leading_int(cells[2]), ap)  # AP is always an integer
         m = re.fullmatch(r"(\d+)([PS])", cells[1])
-        if m:                                                       # formula DVs are skipped
+        if m:  # formula DVs are skipped
             expect("weapon DV", k, int(m.group(1)), dv)
             expect("weapon code", k, m.group(2), code)
 
@@ -121,17 +123,26 @@ def check_weights(md: str, C) -> None:
         if k not in C.ARCHETYPE_WEIGHTS:
             continue
         want = C.ARCHETYPE_WEIGHTS[k]
-        for label, cell, field in (("w_threat", cells[1], "w_threat"),
-                                   ("w_visible", cells[2], "w_visible"),
-                                   ("w_objective", cells[3], "w_objective"),
-                                   ("w_ally_risk", cells[4], "w_ally_risk"),
-                                   ("hysteresis", cells[5], "hysteresis")):
+        for label, cell, field in (
+            ("w_threat", cells[1], "w_threat"),
+            ("w_visible", cells[2], "w_visible"),
+            ("w_objective", cells[3], "w_objective"),
+            ("w_ally_risk", cells[4], "w_ally_risk"),
+            ("hysteresis", cells[5], "hysteresis"),
+        ):
             expect("archetype weights", f"{k}.{label}", float(cell), want[field])
-        expect("archetype weights", f"{k}.morale_bonus",
-               None if cells[6] == "—" else leading_int(cells[6]), want["morale_bonus"])
-        expect("archetype weights", f"{k}.flee_threshold",
-               None if cells[7].startswith("never") else leading_int(cells[7]),
-               want["flee_threshold"])
+        expect(
+            "archetype weights",
+            f"{k}.morale_bonus",
+            None if cells[6] == "—" else leading_int(cells[6]),
+            want["morale_bonus"],
+        )
+        expect(
+            "archetype weights",
+            f"{k}.flee_threshold",
+            None if cells[7].startswith("never") else leading_int(cells[7]),
+            want["flee_threshold"],
+        )
 
 
 def main() -> int:
@@ -140,10 +151,17 @@ def main() -> int:
         return 1
     md = DOC.read_text()
     sys.path.insert(0, str(ROOT))
-    from pinkmohawk import constants as C   # imported late so --help works without the package
+    from pinkmohawk import constants as C  # imported late so --help works without the package
 
-    for check in (check_clock, check_devices, check_armour, check_weapons,
-                  check_energy, check_gear, check_weights):
+    for check in (
+        check_clock,
+        check_devices,
+        check_armour,
+        check_weapons,
+        check_energy,
+        check_gear,
+        check_weights,
+    ):
         before = len(problems)
         check(md, C)
         name = check.__name__.removeprefix("check_")

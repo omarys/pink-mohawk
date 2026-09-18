@@ -66,8 +66,14 @@ type Coord = tuple[int, int]
 
 #: The eight compass offsets, orthogonal first. Diagonals are the four odd-dx, odd-dy pairs.
 DIRECTIONS: Final[tuple[Coord, ...]] = (
-    (0, -1), (1, 0), (0, 1), (-1, 0),
-    (1, -1), (1, 1), (-1, 1), (-1, -1),
+    (0, -1),
+    (1, 0),
+    (0, 1),
+    (-1, 0),
+    (1, -1),
+    (1, 1),
+    (-1, 1),
+    (-1, -1),
 )
 
 #: Marked in flow fields for a wall, an out-of-bounds cell, or anything unreachable.
@@ -79,8 +85,7 @@ def chebyshev(a: Coord, b: Coord) -> int:
     return max(abs(a[0] - b[0]), abs(a[1] - b[1]))
 
 
-def neighbors(m: TileMap, x: int, y: int, *,
-              allow_corner_cutting: bool = False) -> Iterator[Coord]:
+def neighbors(m: TileMap, x: int, y: int, *, allow_corner_cutting: bool = False) -> Iterator[Coord]:
     """Passable neighbours of (x, y), in DIRECTIONS order.
 
     Implements the corner rule from the module docstring: a diagonal is yielded only when at least
@@ -97,8 +102,9 @@ def neighbors(m: TileMap, x: int, y: int, *,
         yield (nx, ny)
 
 
-def a_star(m: TileMap, start: Coord, goal: Coord, *,
-           allow_corner_cutting: bool = False) -> list[Coord] | None:
+def a_star(
+    m: TileMap, start: Coord, goal: Coord, *, allow_corner_cutting: bool = False
+) -> list[Coord] | None:
     """Shortest path from start to goal inclusive, or None when unreachable.
 
     Returns `[start]` when start == goal, and None when either endpoint is a wall or out of bounds.
@@ -125,7 +131,7 @@ def a_star(m: TileMap, start: Coord, goal: Coord, *,
         cur = (x, y)
         g = best.get(cur)
         if g is None or g != f - h:
-            continue                      # stale entry: a cheaper route to cur landed after this push
+            continue  # stale entry: a cheaper route to cur landed after this push
         if cur == goal:
             path = [cur]
             while cur in came:
@@ -135,7 +141,7 @@ def a_star(m: TileMap, start: Coord, goal: Coord, *,
             return path
 
         for nb in neighbors(m, x, y, allow_corner_cutting=allow_corner_cutting):
-            ng = g + 1                    # every step costs 1 Energy, so every edge weighs 1
+            ng = g + 1  # every step costs 1 Energy, so every edge weighs 1
             if ng < best.get(nb, UNREACHABLE):
                 best[nb] = ng
                 came[nb] = cur
@@ -145,8 +151,9 @@ def a_star(m: TileMap, start: Coord, goal: Coord, *,
     return None
 
 
-def step_toward(m: TileMap, start: Coord, goal: Coord, *,
-                allow_corner_cutting: bool = False) -> Coord | None:
+def step_toward(
+    m: TileMap, start: Coord, goal: Coord, *, allow_corner_cutting: bool = False
+) -> Coord | None:
     """The first cell of an optimal path, or None. What a Behavior Tree's `move_to` needs.
 
     None when start == goal (you have arrived) or when the goal is unreachable. The first step cannot
@@ -160,8 +167,9 @@ def step_toward(m: TileMap, start: Coord, goal: Coord, *,
     return None if path is None or len(path) < 2 else path[1]
 
 
-def flow_map(m: TileMap, sources: Iterable[Coord], *,
-             allow_corner_cutting: bool = False) -> bytearray:
+def flow_map(
+    m: TileMap, sources: Iterable[Coord], *, allow_corner_cutting: bool = False
+) -> bytearray:
     """Cost-in-steps from every passable cell to the NEAREST source. `UNREACHABLE` elsewhere.
 
     One BFS with all sources seeded at 0 gives the whole field in O(V) — this is the project's
@@ -196,8 +204,9 @@ def flow_map(m: TileMap, sources: Iterable[Coord], *,
     return field
 
 
-def step_downhill(field: bytearray, width: int, x: int, y: int, *,
-                  allow_corner_cutting: bool = False) -> Coord | None:
+def step_downhill(
+    field: bytearray, width: int, x: int, y: int, *, allow_corner_cutting: bool = False
+) -> Coord | None:
     """The neighbour of (x, y) with the lowest field cost, or None if none is lower.
 
     None at a source (cost 0), on a wall, or on an `UNREACHABLE` cell. Deterministic: ties resolve
@@ -208,7 +217,7 @@ def step_downhill(field: bytearray, width: int, x: int, y: int, *,
         return None
     here = field[y * width + x]
     if here == 0 or here == UNREACHABLE:
-        return None                      # a source, a wall, or sealed ground
+        return None  # a source, a wall, or sealed ground
 
     best_cost, best = here, None
     for dx, dy in DIRECTIONS:
@@ -217,14 +226,18 @@ def step_downhill(field: bytearray, width: int, x: int, y: int, *,
             continue
         cost = field[ny * width + nx]
         if cost == UNREACHABLE or cost >= best_cost:
-            continue                     # strict '<' keeps ties in DIRECTIONS order
-        if dx and dy and not allow_corner_cutting:
-            # Passability proxy: UNREACHABLE means wall or sealed. The field already encodes the
-            # corner rule, so this only matters when field values happen to differ by one across a
-            # sealed seam — rare, but movement must not depend on that coincidence.
-            if (field[y * width + nx] == UNREACHABLE
-                    and field[ny * width + x] == UNREACHABLE):
-                continue
+            continue  # strict '<' keeps ties in DIRECTIONS order
+        # The corner rule, with the field's own reachability as the passability proxy: an
+        # UNREACHABLE neighbour is a wall or sealed ground. The field already encodes the rule, so
+        # this only matters when two values differ by one across a sealed seam.
+        if (
+            dx
+            and dy
+            and not allow_corner_cutting
+            and field[y * width + nx] == UNREACHABLE
+            and field[ny * width + x] == UNREACHABLE
+        ):
+            continue
         best_cost, best = cost, (nx, ny)
 
     return best
@@ -238,7 +251,7 @@ def demo() -> None:
 
     def open_map(w: int, h: int) -> TileMap:
         m = TileMap(w, h)
-        m.fill(1)                                     # 1 = floor
+        m.fill(1)  # 1 = floor
         return m
 
     def cost(path: list[Coord] | None) -> int | None:
@@ -252,21 +265,30 @@ def demo() -> None:
 
     # ---- 2. the heuristic is exact, so cost equals Chebyshev on open ground --------------
     for _ in range(50):
-        a, b = (random.randrange(9), random.randrange(9)), (random.randrange(9), random.randrange(9))
+        a, b = (
+            (random.randrange(9), random.randrange(9)),
+            (random.randrange(9), random.randrange(9)),
+        )
         assert cost(a_star(m, a, b)) == chebyshev(a, b), f"{a}->{b} is not Chebyshev-exact"
 
     # ---- 3. path validity: continuous, wall-free, endpoints right -----------------------
-    def check_valid(m: TileMap, start: Coord, goal: Coord, path: list[Coord] | None,
-                    allow_corner_cutting: bool = False) -> None:
+    def check_valid(
+        m: TileMap,
+        start: Coord,
+        goal: Coord,
+        path: list[Coord] | None,
+        allow_corner_cutting: bool = False,
+    ) -> None:
         if path is None:
             return
         assert path[0] == start and path[-1] == goal, f"endpoints wrong: {path[:2]}..{path[-1]}"
-        for (x, y), (nx, ny) in zip(path, path[1:]):
+        for (x, y), (nx, ny) in zip(path, path[1:], strict=False):
             assert (nx - x, ny - y) in DIRECTIONS, f"not adjacent: {(x, y)}->{(nx, ny)}"
             assert not m.is_wall(nx, ny), f"path crosses a wall at {(nx, ny)}"
             if nx != x and ny != y and not allow_corner_cutting:
-                assert not (m.is_wall(nx, y) and m.is_wall(x, ny)), \
+                assert not (m.is_wall(nx, y) and m.is_wall(x, ny)), (
                     f"corner cut through {(nx, y)}/{(x, ny)} at {(x, y)}"
+                )
 
     # ---- 4. optimality against an independent oracle (BFS), on random maps --------------
     # NOTE: the oracle shares neighbors(), so it validates the SEARCH (heap bookkeeping, g/f,
@@ -303,7 +325,7 @@ def demo() -> None:
     # ---- 5. unreachable, out of bounds, and start-in-wall -------------------------------
     walled = open_map(7, 7)
     for y in range(7):
-        walled.tiles[walled.idx(3, y)] = 0            # full vertical wall
+        walled.tiles[walled.idx(3, y)] = 0  # full vertical wall
     assert a_star(walled, (0, 3), (6, 3)) is None, "a sealed wall must return None"
     assert step_toward(walled, (0, 3), (6, 3)) is None
     small = open_map(5, 5)
@@ -319,16 +341,18 @@ def demo() -> None:
     sealed.tiles[sealed.idx(3, 2)] = 0
     sealed.tiles[sealed.idx(2, 3)] = 0
     assert (3, 3) not in set(neighbors(sealed, 2, 2)), "diagonal between two walls is illegal"
-    assert (3, 3) in set(neighbors(sealed, 2, 2, allow_corner_cutting=True)), \
+    assert (3, 3) in set(neighbors(sealed, 2, 2, allow_corner_cutting=True)), (
         "the flag must reopen that diagonal"
+    )
 
     # ---- 7. the corner rule is load-bearing: a diagonal seam is a wall ------------------
     seam = open_map(7, 7)
     for wx, wy in ((3, 0), (2, 1), (1, 2), (0, 3)):
         seam.tiles[seam.idx(wx, wy)] = 0
     assert a_star(seam, (0, 0), (4, 4)) is None, "the diagonal seam must not be squeezable"
-    assert a_star(seam, (0, 0), (4, 4), allow_corner_cutting=True) is not None, \
+    assert a_star(seam, (0, 0), (4, 4), allow_corner_cutting=True) is not None, (
         "with corner cutting the seam opens"
+    )
     assert chebyshev((0, 0), (4, 4)) == 4
 
     # ---- 8. determinism: same inputs, identical list, every time ------------------------
@@ -403,8 +427,10 @@ def demo() -> None:
         to_source = a_star(d, (x, y), (0, 0))
         assert cost(to_source) == fm[d.idx(x, y)], f"field/A* disagree at {(x, y)}"
 
-    print("OK  a_star + flow_map: optimal against BFS on 200 random maps, corner rule enforced, "
-          "gradient walks land on the source, field agrees with A*")
+    print(
+        "OK  a_star + flow_map: optimal against BFS on 200 random maps, corner rule enforced, "
+        "gradient walks land on the source, field agrees with A*"
+    )
 
 
 if __name__ == "__main__":

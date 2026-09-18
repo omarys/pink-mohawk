@@ -36,9 +36,9 @@ from typing import Final
 from .errors import ValidationError
 
 # --- generator parameters (docs/design/world.md §5.2, §5.3) -----------------------------------
-MAX_IN_DEGREE: Final = 2          # [P12]: a second in-edge makes a merge, the only legal diamond
-SIDE_CHAIN_MAX: Final = 2         # [P11]: side nodes in a single chain
-SIDE_CHAIN_P: Final = 0.25        # chance a side node grows a side child
+MAX_IN_DEGREE: Final = 2  # [P12]: a second in-edge makes a merge, the only legal diamond
+SIDE_CHAIN_MAX: Final = 2  # [P11]: side nodes in a single chain
+SIDE_CHAIN_P: Final = 0.25  # chance a side node grows a side child
 
 # NOTE ON `side_max`: it counts side *branches*, not side nodes. world.md §5.1's "side 0-3" row
 # reads as nodes, but §5.6's own worked example draws "2 side branches of a possible 3, each 2
@@ -49,9 +49,9 @@ JOB_GRAPH: Final = {
     # sec_pre: security nodes between entry and the first objective
     # sec_post: security nodes between the last objective and exit
     "extraction": {"sec_pre": 2, "sec_post": 1, "objectives": 1, "side_max": 3, "min_len": 5},
-    "sabotage":   {"sec_pre": 1, "sec_post": 1, "objectives": 2, "side_max": 2, "min_len": 5},
+    "sabotage": {"sec_pre": 1, "sec_post": 1, "objectives": 2, "side_max": 2, "min_len": 5},
     "protection": {"sec_pre": 1, "sec_post": 1, "objectives": 1, "side_max": 1, "min_len": 4},
-    "courier":    {"sec_pre": 1, "sec_post": 0, "objectives": 1, "side_max": 2, "min_len": 3},
+    "courier": {"sec_pre": 1, "sec_post": 0, "objectives": 1, "side_max": 2, "min_len": 3},
 }
 
 ENTRY, SECURITY, OBJECTIVE, SIDE, EXIT = "entry", "security", "objective", "side", "exit"
@@ -145,7 +145,8 @@ class MissionGraph:
 
     def side_chain_len(self, node: int) -> int:
         """How many side nodes lead into `node`, including it. 1 for a lone side node."""
-        length, cur = 0, node
+        length: int = 0
+        cur: int | None = node
         while cur is not None and self.nodes[cur].kind == SIDE:
             length += 1
             parents = self.nodes[cur].incoming
@@ -181,7 +182,7 @@ class MissionGraph:
         """Node id -> longest distance from entry, in edges. Longest, because a merge must sit
         after every branch that feeds it."""
         order = {n: 0 for n in self.nodes}
-        for _ in range(len(self.nodes)):                 # DAG + ids in topological-ish order
+        for _ in range(len(self.nodes)):  # DAG + ids in topological-ish order
             changed = False
             for n, node in self.nodes.items():
                 for nxt in node.outgoing:
@@ -214,8 +215,9 @@ class MissionGraph:
         while cur != exit_:
             # Walk the route that is closest to the exit, so the "main path" is the shortest
             # entry -> exit route through the objectives rather than any arbitrary walk.
-            nxt = [n for n in self.nodes[cur].outgoing
-                   if n == exit_ or exit_ in self.reachable_from(n)]
+            nxt = [
+                n for n in self.nodes[cur].outgoing if n == exit_ or exit_ in self.reachable_from(n)
+            ]
             if not nxt:
                 raise GraphError(f"no route to exit past node {cur}")
             cur = min(nxt, key=lambda n: self.shortest_path_len(n, exit_))
@@ -224,24 +226,23 @@ class MissionGraph:
 
     def pick_side_parents(self, rng: random.Random, count: int) -> list[int]:
         """Sample main-path nodes without replacement, weighted toward the middle of the path."""
-        candidates = [n for n in self.main_path()
-                      if self.nodes[n].kind not in (ENTRY, EXIT)]
+        candidates = [n for n in self.main_path() if self.nodes[n].kind not in (ENTRY, EXIT)]
         if not candidates or count <= 0:
             return []
         candidates.sort(key=lambda n: self.depth()[n])
         third = max(1, len(candidates) // 3)
-        middle = set(candidates[third:max(third + 1, len(candidates) - third)])
+        middle = set(candidates[third : max(third + 1, len(candidates) - third)])
         pool = list(candidates)
         weights = [3.0 if n in middle else 1.0 for n in pool]
         picked: list[int] = []
         for _ in range(min(count, len(pool))):
             target, acc = rng.random() * sum(weights), 0.0
-            for i, w in enumerate(weights):
-                acc += w
+            for index in range(len(weights)):
+                acc += weights[index]
                 if target <= acc:
+                    picked.append(pool.pop(index))
+                    weights.pop(index)
                     break
-            picked.append(pool.pop(i))
-            weights.pop(i)
         return picked
 
     # -- validation ----------------------------------------------------------------------
@@ -253,7 +254,7 @@ class MissionGraph:
             bad.append(f"expected exactly one entry, found {len(entries)}")
         if len(exits) != 1:
             bad.append(f"expected exactly one exit, found {len(exits)}")
-        if not 1 <= len(self.of_kind(SECURITY)):
+        if not len(self.of_kind(SECURITY)) >= 1:
             bad.append("at least one security node is required")
         if not self.of_kind(OBJECTIVE):
             bad.append("at least one objective is required")
@@ -274,7 +275,9 @@ class MissionGraph:
                     bad.append(f"side node {n} is in a chain longer than {SIDE_CHAIN_MAX}")
                 for nxt in node.outgoing:
                     if self.nodes[nxt].kind != SIDE:
-                        bad.append(f"side node {n} leads to a {self.nodes[nxt].kind}, not a dead end")
+                        bad.append(
+                            f"side node {n} leads to a {self.nodes[nxt].kind}, not a dead end"
+                        )
 
         if not self.is_dag():
             bad.append("graph contains a cycle")
@@ -312,7 +315,7 @@ def build_graph(job_type: str, rng: random.Random, max_attempts: int = 8) -> Mis
             objs = [g.add(OBJECTIVE) for _ in range(cfg["objectives"])]
             for o in objs:
                 g.link(cur, o)
-            merge = g.add(SECURITY)                 # the one legal diamond
+            merge = g.add(SECURITY)  # the one legal diamond
             for o in objs:
                 g.link(o, merge)
             cur = merge
@@ -330,7 +333,7 @@ def build_graph(job_type: str, rng: random.Random, max_attempts: int = 8) -> Mis
         if g.validate():
             continue
         if g.shortest_path_len(g.single(ENTRY), g.single(EXIT)) < cfg["min_len"]:
-            continue                                # too short: re-roll from the same stream
+            continue  # too short: re-roll from the same stream
         return g
 
     raise GraphError(f"{job_type}: no valid graph in {max_attempts} attempts")
@@ -380,7 +383,8 @@ def demo() -> None:
 
     probe = MissionGraph()
     e, s1, o1 = probe.add(ENTRY), probe.add(SECURITY), probe.add(OBJECTIVE)
-    probe.link(e, s1); probe.link(s1, o1)
+    probe.link(e, s1)
+    probe.link(s1, o1)
     assert refuses(lambda: probe.link(o1, e)), "entry must refuse an inbound edge"
     assert refuses(lambda: probe.link(s1, s1)), "self links are illegal"
     assert refuses(lambda: probe.link(e, s1)), "duplicate edges are illegal"
@@ -397,7 +401,8 @@ def demo() -> None:
     deep = MissionGraph()
     d0, d1, d2 = deep.add(SIDE), deep.add(SIDE), deep.add(SIDE)
     h = deep.add(OBJECTIVE)
-    deep.link(h, d0); deep.link(d0, d1)
+    deep.link(h, d0)
+    deep.link(d0, d1)
     assert refuses(lambda: deep.link(d1, d2)), f"side chains stop at {SIDE_CHAIN_MAX}"
 
     x3 = probe.add(EXIT)
@@ -407,9 +412,11 @@ def demo() -> None:
     fan = MissionGraph()
     fan_in = fan.add(ENTRY)
     a1, a2 = fan.add(OBJECTIVE), fan.add(OBJECTIVE)
-    fan.link(fan_in, a1); fan.link(fan_in, a2)
+    fan.link(fan_in, a1)
+    fan.link(fan_in, a2)
     merge = fan.add(SECURITY)
-    fan.link(a1, merge); fan.link(a2, merge)
+    fan.link(a1, merge)
+    fan.link(a2, merge)
     third = fan.add(OBJECTIVE)
     assert refuses(lambda: fan.link(third, merge)), f"in-degree is capped at {MAX_IN_DEGREE}"
 
@@ -426,22 +433,27 @@ def demo() -> None:
     cyclic = MissionGraph()
     c_in, c_a, c_b = cyclic.add(ENTRY), cyclic.add(SECURITY), cyclic.add(OBJECTIVE)
     c_out = cyclic.add(EXIT)
-    cyclic.link(c_in, c_a); cyclic.link(c_a, c_b); cyclic.link(c_b, c_out)
-    cyclic._link_unchecked(c_out, c_a)                 # bypass the builder to make a cycle
+    cyclic.link(c_in, c_a)
+    cyclic.link(c_a, c_b)
+    cyclic.link(c_b, c_out)
+    cyclic._link_unchecked(c_out, c_a)  # bypass the builder to make a cycle
     assert not cyclic.is_dag(), "Kahn's algorithm must see the cycle"
     assert any("cycle" in p for p in cyclic.validate())
 
     smeared = build_graph("extraction", random.Random(3))
     side = smeared.of_kind(SIDE)[0]
     smeared._link_unchecked(side, smeared.single(EXIT))
-    assert any("not a dead end" in p for p in smeared.validate()), "a side->exit edge must be caught"
+    assert any("not a dead end" in p for p in smeared.validate()), (
+        "a side->exit edge must be caught"
+    )
 
     # ---- 7. determinism, and that the seed actually matters ----------------------------
     def shape(g: MissionGraph) -> list[tuple[int, str, tuple[int, ...]]]:
         return [(n, node.kind, tuple(node.outgoing)) for n, node in sorted(g.nodes.items())]
 
-    assert shape(build_graph("extraction", random.Random(77))) == \
-        shape(build_graph("extraction", random.Random(77))), "the same seed must give the same graph"
+    assert shape(build_graph("extraction", random.Random(77))) == shape(
+        build_graph("extraction", random.Random(77))
+    ), "the same seed must give the same graph"
     shapes = {tuple(shape(build_graph("extraction", random.Random(s)))) for s in range(30)}
     assert len(shapes) > 1, "30 seeds produced a single graph shape: the seed is being ignored"
 
@@ -460,8 +472,10 @@ def demo() -> None:
     middle = [p for p in picks if 2 <= picker.depth()[p] <= 5]
     assert len(middle) > len(picks) * 0.6, "side parents should cluster in the middle of the path"
 
-    print(f"OK  mission_graph: {len(JOB_GRAPH)} job types x 40 seeds validate, side branches "
-          f"dead-end, Kahn catches injected cycles, {len(shapes)} shapes from 30 seeds")
+    print(
+        f"OK  mission_graph: {len(JOB_GRAPH)} job types x 40 seeds validate, side branches "
+        f"dead-end, Kahn catches injected cycles, {len(shapes)} shapes from 30 seeds"
+    )
 
 
 if __name__ == "__main__":

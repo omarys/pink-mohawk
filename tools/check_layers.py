@@ -12,15 +12,20 @@ from __future__ import annotations
 import ast
 import pathlib
 import re
-import sys
 
 PACKAGE = pathlib.Path(__file__).resolve().parent.parent / "pinkmohawk"
 ALLOWED_TCOD_IMPORTERS = {"render.py", "input.py", "main.py"}
 
 # algorithms may not import the domain: they operate on coordinates, arrays and plain data
 ALGORITHM_MODULES = {
-    "fov.py", "pathfinding.py", "scheduler.py", "mission_graph.py", "embed.py",
-    "placement.py", "bt.py", "utility.py",
+    "fov.py",
+    "pathfinding.py",
+    "scheduler.py",
+    "mission_graph.py",
+    "embed.py",
+    "placement.py",
+    "bt.py",
+    "utility.py",
 }
 FORBIDDEN_FOR_ALGORITHMS = {"entities.py", "rules.py", "security.py"}
 
@@ -47,7 +52,9 @@ def main() -> int:
         imports = imported_modules(path)
 
         if "tcod" in imports and path.name not in ALLOWED_TCOD_IMPORTERS:
-            failures.append(f"{path.name}: imports tcod but is not one of {sorted(ALLOWED_TCOD_IMPORTERS)}")
+            failures.append(
+                f"{path.name}: imports tcod but is not one of {sorted(ALLOWED_TCOD_IMPORTERS)}"
+            )
 
         if path.name in ALGORITHM_MODULES:
             illegal = imports & FORBIDDEN_FOR_ALGORITHMS
@@ -55,8 +62,11 @@ def main() -> int:
                 failures.append(f"{path.name}: algorithm imports the domain ({sorted(illegal)})")
 
     # the renderer seam should also be discoverable by plain grep, as a second opinion on the AST
-    grep_hits = {p.name for p in PACKAGE.glob("*.py")
-                 if re.search(r"^\s*(import\s+tcod|from\s+tcod)", p.read_text(encoding="utf-8"), re.M)}
+    grep_hits = {
+        p.name
+        for p in PACKAGE.glob("*.py")
+        if re.search(r"^\s*(import\s+tcod|from\s+tcod)", p.read_text(encoding="utf-8"), re.M)
+    }
     if grep_hits != {n for n in grep_hits if n in ALLOWED_TCOD_IMPORTERS}:
         failures.append(f"grep found tcod in {sorted(grep_hits - ALLOWED_TCOD_IMPORTERS)}")
 
@@ -66,8 +76,10 @@ def main() -> int:
             print("  " + line)
         return 1
 
-    print(f"OK  layer law holds across {len(list(PACKAGE.glob('*.py')))} modules "
-          f"(tcod importers: none yet; allowed: {sorted(ALLOWED_TCOD_IMPORTERS)})")
+    print(
+        f"OK  layer law holds across {len(list(PACKAGE.glob('*.py')))} modules "
+        f"(tcod importers: none yet; allowed: {sorted(ALLOWED_TCOD_IMPORTERS)})"
+    )
     return 0
 
 

@@ -38,8 +38,16 @@ from .constants import ENERGY_COSTS, MAX_TICKS_PER_STEP
 from .errors import RuntimeFailure, ValidationError
 
 #: The eight node types of DECISIONS §8, one spelling per concept (ai.md §2).
-NODE_TYPES: Final = ("selector", "sequence", "condition", "action",
-                     "inverter", "succeeder", "cooldown", "repeat")
+NODE_TYPES: Final = (
+    "selector",
+    "sequence",
+    "condition",
+    "action",
+    "inverter",
+    "succeeder",
+    "cooldown",
+    "repeat",
+)
 COMPOSITES: Final = ("selector", "sequence")
 DECORATORS: Final = ("inverter", "succeeder", "cooldown", "repeat")
 LEAVES: Final = ("condition", "action")
@@ -87,13 +95,13 @@ class Node:
     type: str
     path: str
     name: str | None = None
-    kind: str | None = None          # "check" for conditions, "action" for actions
+    kind: str | None = None  # "check" for conditions, "action" for actions
     args: Mapping[str, Any] = field(default_factory=dict)
     children: tuple[Node, ...] = ()
     child: Node | None = None
-    passes: int = 0                  # cooldown
-    times: int = 0                   # repeat
-    reactive: bool = True            # selector
+    passes: int = 0  # cooldown
+    times: int = 0  # repeat
+    reactive: bool = True  # selector
 
     @property
     def trace_name(self) -> str:
@@ -112,10 +120,10 @@ class Tree:
 class BTState:
     """Everything mutable about one actor's use of a tree. One per actor; never shared."""
 
-    resume: dict[str, int] = field(default_factory=dict)      # path -> child index to resume at
-    cooldowns: dict[str, int] = field(default_factory=dict)   # name-or-path -> Passes remaining
-    repeats: dict[str, int] = field(default_factory=dict)     # path -> completions so far
-    running: dict[str, int] = field(default_factory=dict)     # path -> the RUNNING child index
+    resume: dict[str, int] = field(default_factory=dict)  # path -> child index to resume at
+    cooldowns: dict[str, int] = field(default_factory=dict)  # name-or-path -> Passes remaining
+    repeats: dict[str, int] = field(default_factory=dict)  # path -> completions so far
+    running: dict[str, int] = field(default_factory=dict)  # path -> the RUNNING child index
     root_status: Status | None = None
 
     def clear_branch(self, node: Node) -> None:
@@ -164,8 +172,12 @@ class TickContext:
 # ----------------------------------------------------------------------------------------------
 # Loading and validation (ai.md §2.2, §2.3) — all errors, then refusal
 # ----------------------------------------------------------------------------------------------
-def load(document: Mapping[str, Any], *, known_actions: Mapping[str, frozenset[str]],
-         known_checks: Mapping[str, frozenset[str]]) -> Tree:
+def load(
+    document: Mapping[str, Any],
+    *,
+    known_actions: Mapping[str, frozenset[str]],
+    known_checks: Mapping[str, frozenset[str]],
+) -> Tree:
     """Parse and validate a tree document, or raise SchemaError listing every problem.
 
     `known_actions` maps an action name to its declared arg keys; `known_checks` does the same for
@@ -198,15 +210,16 @@ def load(document: Mapping[str, Any], *, known_actions: Mapping[str, frozenset[s
         seen_paths.append(path)
         ntype = raw.get("type")
         if ntype not in NODE_TYPES:
-            errors.append(f"E_UNKNOWN_NODE_TYPE {path} {ntype!r} is not one of "
-                          f"{'|'.join(NODE_TYPES)}")
+            errors.append(
+                f"E_UNKNOWN_NODE_TYPE {path} {ntype!r} is not one of {'|'.join(NODE_TYPES)}"
+            )
             return None
 
         extra = set(raw) - ALLOWED_KEYS[ntype]
         if extra:
             errors.append(f"E_UNKNOWN_KEY {path} {sorted(extra)} not allowed on {ntype}")
         missing = ALLOWED_KEYS[ntype] - set(raw)
-        missing -= {"type", "name", "args", "reactive"}          # optional on every type
+        missing -= {"type", "name", "args", "reactive"}  # optional on every type
         if missing:
             errors.append(f"E_MISSING_KEY {path} {ntype} requires {sorted(missing)}")
             return None
@@ -221,7 +234,9 @@ def load(document: Mapping[str, Any], *, known_actions: Mapping[str, frozenset[s
             if not isinstance(kids, list) or not kids:
                 errors.append(f"E_EMPTY_CHILDREN {path} {ntype} needs at least one child")
                 return None
-            built = tuple(n for i, k in enumerate(kids) if (n := visit(k, f"{path}.{i}")) is not None)
+            built = tuple(
+                n for i, k in enumerate(kids) if (n := visit(k, f"{path}.{i}")) is not None
+            )
             reactive = raw.get("reactive", True)
             if not isinstance(reactive, bool):
                 errors.append(f"E_REACTIVE {path} reactive must be a boolean")
@@ -248,8 +263,9 @@ def load(document: Mapping[str, Any], *, known_actions: Mapping[str, frozenset[s
         if not isinstance(args, Mapping):
             errors.append(f"E_ARGS {path} args must be an object")
             args = {}
-        catalogue, key_name = ((known_checks, "check") if ntype == "condition"
-                               else (known_actions, "action"))
+        catalogue, key_name = (
+            (known_checks, "check") if ntype == "condition" else (known_actions, "action")
+        )
         key = raw[key_name]
         if key not in catalogue:
             errors.append(f"E_UNKNOWN_{key_name.upper()} {path} {key!r} is not in the catalogue")
@@ -265,6 +281,7 @@ def load(document: Mapping[str, Any], *, known_actions: Mapping[str, frozenset[s
 
     if errors:
         raise SchemaError(errors)
+    assert root is not None  # unreachable with a bad root: the checks above have raised
 
     tree_id = document["id"]
     if not isinstance(tree_id, str) or not tree_id:
@@ -278,7 +295,7 @@ def load(document: Mapping[str, Any], *, known_actions: Mapping[str, frozenset[s
 @dataclass(slots=True)
 class _Frame:
     node: Node
-    phase: str                       # "DESCEND" | "ASCEND"
+    phase: str  # "DESCEND" | "ASCEND"
     idx: int
     status: Status | None = None
 
@@ -296,8 +313,12 @@ def _enter_index(node: Node, state: BTState) -> int:
     return 0
 
 
-def tick(tree: Tree, state: BTState, eval_leaf: Callable[[str, Mapping[str, Any], TickContext], Status],
-         ctx: TickContext | None = None) -> tuple[Status, int]:
+def tick(
+    tree: Tree,
+    state: BTState,
+    eval_leaf: Callable[[str, Mapping[str, Any], TickContext], Status],
+    ctx: TickContext | None = None,
+) -> tuple[Status, int]:
     """Resolve at most one atomic action. Returns (root status, Energy the caller must charge).
 
     The returned cost comes from what the handler declared through `ctx.charge(...)`; this function
@@ -323,13 +344,16 @@ def tick(tree: Tree, state: BTState, eval_leaf: Callable[[str, Mapping[str, Any]
                 if resolved > MAX_TICKS_PER_STEP:
                     raise BTLivelock(
                         f"tree {tree.id}: more than {MAX_TICKS_PER_STEP} leaf resolutions in one "
-                        f"step (deepest node {node.path})")
+                        f"step (deepest node {node.path})"
+                    )
             if ntype == "condition":
                 stack.pop()
                 status = eval_leaf(node.kind or "", node.args, context)
                 if status is Status.RUNNING:
-                    raise HandlerError(f"condition {node.trace_name} returned RUNNING; "
-                                       "conditions are predicates (ai.md §3.2)")
+                    raise HandlerError(
+                        f"condition {node.trace_name} returned RUNNING; "
+                        "conditions are predicates (ai.md §3.2)"
+                    )
                 _deliver(stack, state, status)
             elif ntype == "action":
                 stack.pop()
@@ -368,11 +392,13 @@ def tick(tree: Tree, state: BTState, eval_leaf: Callable[[str, Mapping[str, Any]
                 else:
                     assert node.child is not None
                     stack.append(_Frame(node.child, "DESCEND", _enter_index(node.child, state)))
-            else:                                            # unreachable: validation refuses it
+            else:  # unreachable: validation refuses it
                 raise SchemaError([f"E_UNKNOWN_NODE_TYPE {node.path} {ntype!r}"])
 
-        else:                                                # ASCEND
-            status = frame.status
+        else:  # ASCEND
+            if frame.status is None:  # unreachable: _deliver always sets it before ASCEND
+                raise HandlerError(f"internal: frame {node.path} ascended without a status")
+            status = frame.status  # narrowed to Status by the check, not asserted
             ntype = node.type
             if ntype == "selector":
                 if status is Status.FAILURE:
@@ -405,14 +431,21 @@ def tick(tree: Tree, state: BTState, eval_leaf: Callable[[str, Mapping[str, Any]
                     _deliver(stack, state, Status.FAILURE)
             elif ntype == "inverter":
                 stack.pop()
-                _deliver(stack, state, Status.RUNNING if status is Status.RUNNING else
-                         (Status.SUCCESS if status is Status.FAILURE else Status.FAILURE))
+                _deliver(
+                    stack,
+                    state,
+                    Status.RUNNING
+                    if status is Status.RUNNING
+                    else (Status.SUCCESS if status is Status.FAILURE else Status.FAILURE),
+                )
             elif ntype == "succeeder":
                 stack.pop()
-                _deliver(stack, state, Status.RUNNING if status is Status.RUNNING else Status.SUCCESS)
+                _deliver(
+                    stack, state, Status.RUNNING if status is Status.RUNNING else Status.SUCCESS
+                )
             elif ntype == "cooldown":
                 if status is Status.SUCCESS:
-                    state.cooldowns[cooldown_key(node)] = node.passes   # arm on success only
+                    state.cooldowns[cooldown_key(node)] = node.passes  # arm on success only
                 stack.pop()
                 _deliver(stack, state, status)
             elif ntype == "repeat":
@@ -425,7 +458,7 @@ def tick(tree: Tree, state: BTState, eval_leaf: Callable[[str, Mapping[str, Any]
                     _deliver(stack, state, Status.RUNNING)
                 else:
                     state.repeats[node.path] = state.repeats.get(node.path, 0) + 1
-                    if node.times == 0:                    # decision 8: one rep per step
+                    if node.times == 0:  # decision 8: one rep per step
                         state.resume[node.path] = 0
                         stack.pop()
                         _deliver(stack, state, Status.RUNNING)
@@ -480,9 +513,13 @@ def tick_cooldowns(state: BTState) -> None:
 # Acceptance test
 # ==============================================================================================
 def demo() -> None:
-    ACTIONS = {"act": frozenset(), "move": frozenset(), "shout": frozenset(),
-               "with_arg": frozenset({"n"})}
-    CHECKS = {"yes": frozenset(), "no": frozenset()}
+    ACTIONS = {
+        "act": frozenset(),
+        "move": frozenset(),
+        "shout": frozenset(),
+        "with_arg": frozenset({"n"}),
+    }
+    CHECKS: dict[str, frozenset[str]] = {"yes": frozenset(), "no": frozenset()}
 
     def build(doc):
         return load(doc, known_actions=ACTIONS, known_checks=CHECKS)
@@ -501,37 +538,58 @@ def demo() -> None:
             if out is Status.SUCCESS and name in cost_key:
                 ctx.charge(cost_key[name])
             return out
+
         return handler
 
     # ---- 1. loading: valid tree, exact paths assigned, immutability --------------------
-    tree = build({"id": "t", "root": {"type": "sequence", "children": [
-        {"type": "condition", "check": "yes"},
-        {"type": "action", "action": "act", "name": "strike"}]}})
+    tree = build(
+        {
+            "id": "t",
+            "root": {
+                "type": "sequence",
+                "children": [
+                    {"type": "condition", "check": "yes"},
+                    {"type": "action", "action": "act", "name": "strike"},
+                ],
+            },
+        }
+    )
     assert tree.id == "t"
     assert tree.root.path == "root"
     assert tree.root.children[1].path == "root.1"
     assert tree.root.children[1].trace_name == "strike"
     assert isinstance(tree.root, Node)
     try:
-        tree.root.name = "nope"                      # frozen dataclass
+        tree.root.name = "nope"  # type: ignore[misc]  # deliberate: must raise
     except FrozenInstanceError:
         pass
     else:
         raise AssertionError("Node must be immutable: trees are shared between actors")
 
     # ---- 2. validation reports every error at once, then refuses ----------------------
-    bad = {"id": "b", "root": {"type": "selector", "children": [
-        {"type": "sequencer", "children": []},
-        {"type": "action", "action": "missing_action"},
-        {"type": "condition", "check": "yes", "args": {"nope": 1}},
-        {"type": "cooldown", "passes": 0, "child": {"type": "action", "action": "act"}},
-    ]}}
+    bad = {
+        "id": "b",
+        "root": {
+            "type": "selector",
+            "children": [
+                {"type": "sequencer", "children": []},
+                {"type": "action", "action": "missing_action"},
+                {"type": "condition", "check": "yes", "args": {"nope": 1}},
+                {"type": "cooldown", "passes": 0, "child": {"type": "action", "action": "act"}},
+            ],
+        },
+    }
     try:
         build(bad)
         raise AssertionError("a malformed tree must not load")
     except SchemaError as e:
         codes = " ".join(e.args[0])
-        for expected in ("E_UNKNOWN_NODE_TYPE", "E_UNKNOWN_ACTION", "E_UNDECLARED_ARGS", "E_PASSES"):
+        for expected in (
+            "E_UNKNOWN_NODE_TYPE",
+            "E_UNKNOWN_ACTION",
+            "E_UNDECLARED_ARGS",
+            "E_PASSES",
+        ):
             assert expected in codes, f"{expected} missing from {codes}"
     # an unknown key on a node type is a load error, not a silent ignore
     try:
@@ -541,9 +599,18 @@ def demo() -> None:
         assert "E_UNKNOWN_KEY" in e.args[0][0]
 
     # ---- 3. sequence order, and conditions never return RUNNING ----------------------
-    seq = build({"id": "s", "root": {"type": "sequence", "children": [
-        {"type": "condition", "check": "yes"},
-        {"type": "action", "action": "act"}]}})
+    seq = build(
+        {
+            "id": "s",
+            "root": {
+                "type": "sequence",
+                "children": [
+                    {"type": "condition", "check": "yes"},
+                    {"type": "action", "action": "act"},
+                ],
+            },
+        }
+    )
     st = BTState()
     status, cost = tick(seq, st, scripted([Status.SUCCESS, Status.SUCCESS]), TickContext())
     assert status is Status.SUCCESS and cost == ENERGY_COSTS["attack"]
@@ -552,6 +619,7 @@ def demo() -> None:
 
     def bad_handler(name, args, ctx):
         return Status.RUNNING
+
     try:
         tick(seq, BTState(), bad_handler, TickContext())
         raise AssertionError("a Condition returning RUNNING must be rejected")
@@ -559,95 +627,179 @@ def demo() -> None:
         pass
 
     # ---- 4. RUNNING resumes at the same child instead of restarting ------------------
-    run = build({"id": "r", "root": {"type": "sequence", "children": [
-        {"type": "condition", "check": "yes"},
-        {"type": "action", "action": "move"}]}})
+    run = build(
+        {
+            "id": "r",
+            "root": {
+                "type": "sequence",
+                "children": [
+                    {"type": "condition", "check": "yes"},
+                    {"type": "action", "action": "move"},
+                ],
+            },
+        }
+    )
     st = BTState()
     status, _ = tick(run, st, scripted([Status.SUCCESS, Status.RUNNING]), TickContext())
     assert status is Status.RUNNING and st.resume["root"] == 1
     calls = []
-    status, _ = tick(run, st, lambda n, a, c: (calls.append(n), Status.SUCCESS)[1], TickContext())
+
+    def record_then_succeed(name, args, ctx):  # a named handler: the clever lambda that used to be
+        calls.append(name)  # here returned nothing (mypy) and read badly
+        return Status.SUCCESS
+
+    status, _ = tick(run, st, record_then_succeed, TickContext())
     assert calls == ["move"], f"the satisfied condition must not re-run, got {calls}"
     assert status is Status.SUCCESS
 
     # ---- 5. inverter and succeeder --------------------------------------------------
-    inv = build({"id": "i", "root": {"type": "inverter", "child": {"type": "condition", "check": "yes"}}})
+    inv = build(
+        {"id": "i", "root": {"type": "inverter", "child": {"type": "condition", "check": "yes"}}}
+    )
     assert tick(inv, BTState(), scripted([Status.SUCCESS]), TickContext())[0] is Status.FAILURE
     assert tick(inv, BTState(), scripted([Status.FAILURE]), TickContext())[0] is Status.SUCCESS
     # RUNNING must come from an Action: a Condition may not return it (ai.md §3.2)
-    inv_act = build({"id": "ia", "root": {"type": "inverter",
-                                          "child": {"type": "action", "action": "act"}}})
+    inv_act = build(
+        {"id": "ia", "root": {"type": "inverter", "child": {"type": "action", "action": "act"}}}
+    )
     assert tick(inv_act, BTState(), scripted([Status.RUNNING]), TickContext())[0] is Status.RUNNING
-    suc = build({"id": "u", "root": {"type": "succeeder", "child": {"type": "condition", "check": "no"}}})
+    suc = build(
+        {"id": "u", "root": {"type": "succeeder", "child": {"type": "condition", "check": "no"}}}
+    )
     assert tick(suc, BTState(), scripted([Status.FAILURE]), TickContext())[0] is Status.SUCCESS
 
     # ---- 6. cooldown arms on SUCCESS only, and survives a tree reset (decision 1) ----
-    cd = build({"id": "c", "root": {"type": "cooldown", "passes": 3, "name": "shout_cd",
-                                   "child": {"type": "action", "action": "shout"}}})
+    cd = build(
+        {
+            "id": "c",
+            "root": {
+                "type": "cooldown",
+                "passes": 3,
+                "name": "shout_cd",
+                "child": {"type": "action", "action": "shout"},
+            },
+        }
+    )
     st = BTState()
     assert tick(cd, st, scripted([Status.SUCCESS]), TickContext())[0] is Status.SUCCESS
     assert st.cooldowns == {"shout_cd": 3}, st.cooldowns
-    assert tick(cd, st, scripted([]), TickContext())[0] is Status.FAILURE, "armed -> FAILURE at 0 cost"
+    assert tick(cd, st, scripted([]), TickContext())[0] is Status.FAILURE, (
+        "armed -> FAILURE at 0 cost"
+    )
     reset_tree(cd, st)
     assert st.cooldowns == {"shout_cd": 3}, "reset_tree must NOT clear cooldowns"
-    tick_cooldowns(st); tick_cooldowns(st); tick_cooldowns(st)
+    tick_cooldowns(st)
+    tick_cooldowns(st)
+    tick_cooldowns(st)
     assert st.cooldowns == {}, "cooldowns tick down per Pass"
 
     # ---- 7. cooldown keying: name when given, else path (decision 6) -----------------
-    unnamed = build({"id": "n", "root": {"type": "cooldown", "passes": 2,
-                                        "child": {"type": "action", "action": "act"}}})
+    unnamed = build(
+        {
+            "id": "n",
+            "root": {"type": "cooldown", "passes": 2, "child": {"type": "action", "action": "act"}},
+        }
+    )
     st = BTState()
     tick(unnamed, st, scripted([Status.SUCCESS]), TickContext())
     assert list(st.cooldowns) == ["root"], f"expected the path as the key, got {st.cooldowns}"
 
     # ---- 8. repeat: times=0 is one repetition per step and stays RUNNING (decision 8) -
-    rep = build({"id": "p", "root": {"type": "repeat", "times": 0,
-                                    "child": {"type": "action", "action": "act"}}})
+    rep = build(
+        {
+            "id": "p",
+            "root": {"type": "repeat", "times": 0, "child": {"type": "action", "action": "act"}},
+        }
+    )
     st = BTState()
     for _ in range(3):
-        assert tick(rep, st, scripted([Status.SUCCESS]), TickContext())[0] is Status.RUNNING, \
+        assert tick(rep, st, scripted([Status.SUCCESS]), TickContext())[0] is Status.RUNNING, (
             "times:0 must not report SUCCESS: it is unbounded, one rep per step"
+        )
     assert st.repeats["root"] == 3
     # A FINITE repeat is atomic within one decision step: `times: 3` resolves all three repetitions
     # and returns SUCCESS in a single tick. Only `times: 0` spans steps. That asymmetry is what makes
     # a large finite count the livelock risk the cap exists for, and it is worth knowing before
     # writing a tree with `times: 500`.
-    rep3 = build({"id": "p3", "root": {"type": "repeat", "times": 3,
-                                      "child": {"type": "action", "action": "act"}}})
+    rep3 = build(
+        {
+            "id": "p3",
+            "root": {"type": "repeat", "times": 3, "child": {"type": "action", "action": "act"}},
+        }
+    )
     st = BTState()
     seen = [tick(rep3, st, scripted([Status.SUCCESS] * 3), TickContext())[0] for _ in range(2)]
     assert seen == [Status.SUCCESS, Status.SUCCESS], seen
     assert st.repeats.get("root", 0) == 0, "the counter resets once the repeat completes"
 
     # ---- 9. a preempted RUNNING branch is cleared, so it restarts fresh (decision 2) --
-    pre = build({"id": "pre", "root": {"type": "selector", "reactive": True, "children": [
-        {"type": "sequence", "children": [
-            {"type": "action", "action": "move"},
-            {"type": "action", "action": "act"}]},
-        {"type": "condition", "check": "yes"}]}})
+    pre = build(
+        {
+            "id": "pre",
+            "root": {
+                "type": "selector",
+                "reactive": True,
+                "children": [
+                    {
+                        "type": "sequence",
+                        "children": [
+                            {"type": "action", "action": "move"},
+                            {"type": "action", "action": "act"},
+                        ],
+                    },
+                    {"type": "condition", "check": "yes"},
+                ],
+            },
+        }
+    )
     st = BTState()
     assert tick(pre, st, scripted([Status.RUNNING]), TickContext())[0] is Status.RUNNING
     assert st.resume.get("root.0") == 0
     # next step branch 0 fails, the second branch wins, so branch 0 is abandoned and its state dropped
-    assert tick(pre, st, scripted([Status.FAILURE, Status.SUCCESS]), TickContext())[0] is Status.SUCCESS
+    assert (
+        tick(pre, st, scripted([Status.FAILURE, Status.SUCCESS]), TickContext())[0]
+        is Status.SUCCESS
+    )
     assert "root.0" not in st.resume, f"abandoned branch kept its resume index: {st.resume}"
     assert st.running == {}, st.running
 
     # ---- 10. per-actor isolation: one shared tree, two states (decision 1) -----------
-    shared = build({"id": "sh", "root": {"type": "sequence", "children": [
-        {"type": "action", "action": "move"}, {"type": "action", "action": "act"}]}})
+    shared = build(
+        {
+            "id": "sh",
+            "root": {
+                "type": "sequence",
+                "children": [
+                    {"type": "action", "action": "move"},
+                    {"type": "action", "action": "act"},
+                ],
+            },
+        }
+    )
     a_state, b_state = BTState(), BTState()
     tick(shared, a_state, scripted([Status.RUNNING]), TickContext())
     tick(shared, b_state, scripted([Status.SUCCESS, Status.SUCCESS]), TickContext())
     assert a_state.resume == {"root": 0} and b_state.resume == {"root": 0}
-    assert tick(shared, b_state, scripted([Status.SUCCESS, Status.SUCCESS]), TickContext())[0] is Status.SUCCESS
+    assert (
+        tick(shared, b_state, scripted([Status.SUCCESS, Status.SUCCESS]), TickContext())[0]
+        is Status.SUCCESS
+    )
     assert a_state.root_status in (None, Status.RUNNING), "actor A's state must be untouched"
 
     # ---- 11. the livelock cap turns a spin into an error (decision 7) ---------------
     # A repeat with a large FINITE count and a cheap child resolves many leaves inside one tick;
     # that is the spin the cap exists for. A times:0 repeat cannot spin, because decision 8 makes it
     # return RUNNING once per decision step.
-    spin = build({"id": "spin", "root": {"type": "repeat", "times": 1000, "child": {"type": "succeeder", "child": {"type": "condition", "check": "yes"}}}})
+    spin = build(
+        {
+            "id": "spin",
+            "root": {
+                "type": "repeat",
+                "times": 1000,
+                "child": {"type": "succeeder", "child": {"type": "condition", "check": "yes"}},
+            },
+        }
+    )
     try:
         tick(spin, BTState(), scripted([Status.SUCCESS] * 4000), TickContext())
     except BTLivelock as e:
@@ -656,13 +808,23 @@ def demo() -> None:
         raise AssertionError("expected the livelock cap to trip")
 
     # ---- 12. Energy accounting belongs to the caller (decision 5) ------------------
-    spend = build({"id": "sp", "root": {"type": "sequence", "children": [
-        {"type": "action", "action": "move"}, {"type": "action", "action": "act"}]}})
+    spend = build(
+        {
+            "id": "sp",
+            "root": {
+                "type": "sequence",
+                "children": [
+                    {"type": "action", "action": "move"},
+                    {"type": "action", "action": "act"},
+                ],
+            },
+        }
+    )
     actor = type("A", (), {"energy": 10})()
     ctx = TickContext()
     status, cost = tick(spend, BTState(), scripted([Status.SUCCESS, Status.SUCCESS]), ctx)
     assert actor.energy == 10, "the ticker must not touch Energy: it does not know the actor"
-    actor.energy -= cost                          # the caller charges, exactly once
+    actor.energy -= cost  # the caller charges, exactly once
     assert status is Status.SUCCESS
     assert ctx.actions == [("step", 1), ("attack", 10)], ctx.actions
     assert cost == ENERGY_COSTS["step"] + ENERGY_COSTS["attack"] == 11
@@ -673,15 +835,33 @@ def demo() -> None:
     except KeyError:
         pass
 
-    print(f"OK  bt: schema validation ({len(ERROR_NAMES)} error codes), {len(NODE_TYPES)} node types, "
-          f"RUNNING resume, cooldown arm-on-success, repeat times:0 per step, "
-          f"livelock cap {MAX_TICKS_PER_STEP}, per-actor isolation")
+    print(
+        f"OK  bt: schema validation ({len(ERROR_NAMES)} error codes), {len(NODE_TYPES)} node types, "
+        f"RUNNING resume, cooldown arm-on-success, repeat times:0 per step, "
+        f"livelock cap {MAX_TICKS_PER_STEP}, per-actor isolation"
+    )
 
 
-ERROR_NAMES: Final = ("E_DOCUMENT", "E_MISSING_KEY", "E_ARCHETYPE", "E_PARAMS", "E_NOT_OBJECT",
-                      "E_UNKNOWN_NODE_TYPE", "E_UNKNOWN_KEY", "E_NAME", "E_EMPTY_CHILDREN",
-                      "E_REACTIVE", "E_PASSES", "E_TIMES", "E_ARGS", "E_UNKNOWN_ACTION",
-                      "E_UNKNOWN_CHECK", "E_UNDECLARED_ARGS", "E_ROOT", "E_ID")
+ERROR_NAMES: Final = (
+    "E_DOCUMENT",
+    "E_MISSING_KEY",
+    "E_ARCHETYPE",
+    "E_PARAMS",
+    "E_NOT_OBJECT",
+    "E_UNKNOWN_NODE_TYPE",
+    "E_UNKNOWN_KEY",
+    "E_NAME",
+    "E_EMPTY_CHILDREN",
+    "E_REACTIVE",
+    "E_PASSES",
+    "E_TIMES",
+    "E_ARGS",
+    "E_UNKNOWN_ACTION",
+    "E_UNKNOWN_CHECK",
+    "E_UNDECLARED_ARGS",
+    "E_ROOT",
+    "E_ID",
+)
 
 if __name__ == "__main__":
     demo()

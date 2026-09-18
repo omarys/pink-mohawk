@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import heapq
 import random
-from typing import Any, Final, Protocol
+from typing import Any, Protocol
 
 from .constants import (
     INITIATIVE_DICE_BASE,
@@ -36,6 +36,7 @@ from .constants import (
 
 class ActorLike(Protocol):
     """What the scheduler needs from an actor. Structural, so `entities.Actor` need not inherit."""
+
     id: int
     attrs: dict[str, int]
     score: int
@@ -60,7 +61,7 @@ class BucketQueue:
         self._count = 0
 
     def insert(self, actor: Any, energy: int) -> None:
-        e = max(0, min(int(energy), self.max_energy))   # clamp: never index out of range
+        e = max(0, min(int(energy), self.max_energy))  # clamp: never index out of range
         self.buckets[e].append(actor)
         self._count += 1
         if e > self.top:
@@ -73,7 +74,7 @@ class BucketQueue:
                 best = min(range(len(bucket)), key=lambda i: _tie_key(bucket[i]))
                 self._count -= 1
                 return bucket.pop(best)
-            self.top -= 1                               # cursor only ever moves down during pops
+            self.top -= 1  # cursor only ever moves down during pops
         return None
 
     def __len__(self) -> int:
@@ -99,8 +100,9 @@ class HeapQueue:
     def insert(self, actor: Any, energy: int) -> None:
         e = max(0, min(int(energy), MAX_ENERGY))
         self._tie += 1
-        heapq.heappush(self._heap,
-                       (-e, -int(actor.attrs["reaction"]), int(actor.id), self._tie, actor))
+        heapq.heappush(
+            self._heap, (-e, -int(actor.attrs["reaction"]), int(actor.id), self._tie, actor)
+        )
 
     def pop_max(self) -> Any | None:
         return heapq.heappop(self._heap)[-1] if self._heap else None
@@ -181,8 +183,13 @@ def end_turn(queue: Any, actor: Any, action_cost: int) -> None:
         end_pass(queue, actor)
 
 
-def run_round(queue: Any, actors: list[Any], rng: random.Random,
-              cost_of: Any = lambda a: 10, limit: int = 10_000) -> list[tuple[int, int]]:
+def run_round(
+    queue: Any,
+    actors: list[Any],
+    rng: random.Random,
+    cost_of: Any = lambda a: 10,
+    limit: int = 10_000,
+) -> list[tuple[int, int]]:
     """Drive a whole Round for the self-check: returns (actor id, pass_no) per action taken."""
     begin_round(actors, rng, queue)
     trace: list[tuple[int, int]] = []
@@ -201,8 +208,14 @@ def run_round(queue: Any, actors: list[Any], rng: random.Random,
 # ======================================================================================
 def demo() -> None:
     class _TestActor:
-        def __init__(self, aid: int, reaction: int, intuition: int,
-                     reflexes: int = 0, cooldowns: dict[str, int] | None = None) -> None:
+        def __init__(
+            self,
+            aid: int,
+            reaction: int,
+            intuition: int,
+            reflexes: int = 0,
+            cooldowns: dict[str, int] | None = None,
+        ) -> None:
             self.id = aid
             self.attrs = {"reaction": reaction, "intuition": intuition}
             self.improved_reflexes_dice = reflexes
@@ -216,20 +229,23 @@ def demo() -> None:
     q = BucketQueue()
     a, b = _TestActor(7, 4, 4), _TestActor(3, 4, 4)
     a.energy = b.energy = 8
-    q.insert(a, 8); q.insert(b, 8)
+    q.insert(a, 8)
+    q.insert(b, 8)
     assert q.pop_max() is b, "lower id must win a Reaction tie"
     assert q.pop_max() is a
     assert q.pop_max() is None and not q
 
     weaker = _TestActor(1, 2, 2)
     stronger = _TestActor(2, 6, 2)
-    q.insert(weaker, 4); q.insert(stronger, 8)
+    q.insert(weaker, 4)
+    q.insert(stronger, 8)
     assert q.pop_max() is stronger, "higher Energy goes first regardless of Reaction"
 
     # ---- 2. Reaction breaks a tie before id does ---------------------------------------
     q2 = BucketQueue()
-    slow, fast = _TestActor(1, 2, 6), _TestActor(9, 6, 2)     # both Energy 8
-    q2.insert(slow, 8); q2.insert(fast, 8)
+    slow, fast = _TestActor(1, 2, 6), _TestActor(9, 6, 2)  # both Energy 8
+    q2.insert(slow, 8)
+    q2.insert(fast, 8)
     assert q2.pop_max() is fast, "higher Reaction wins even with a higher id"
 
     # ---- 3. clamping, and no crash on out-of-range Energy -------------------------------
@@ -248,21 +264,24 @@ def demo() -> None:
         cast = [_TestActor(i, rng.randint(1, 7), rng.randint(1, 7)) for i in range(12)]
         energies = [rng.randint(0, 30) for _ in cast]
         bq, hq = BucketQueue(), HeapQueue()
-        for actor, e in zip(cast, energies):
-            bq.insert(actor, e); hq.insert(actor, e)
-        order_b = [bq.pop_max().id for _ in range(len(cast))]
-        order_h = [hq.pop_max().id for _ in range(len(cast))]
+        for actor, e in zip(cast, energies, strict=True):
+            bq.insert(actor, e)
+            hq.insert(actor, e)
+        popped_b = [bq.pop_max() for _ in range(len(cast))]
+        popped_h = [hq.pop_max() for _ in range(len(cast))]
+        order_b = [a.id for a in popped_b if a is not None]
+        order_h = [a.id for a in popped_h if a is not None]
         assert order_b == order_h, f"bucket and heap disagree: {order_b} vs {order_h}"
 
     # ---- 5. Pass arithmetic: Score 18 -> Passes at 18 and 8, then done -------------------
-    solo = _TestActor(1, 10, 8)          # Energy 18 before dice
+    solo = _TestActor(1, 10, 8)  # Energy 18 before dice
     solo.score = solo.energy = 18
     q5 = BucketQueue()
     q5.insert(solo, solo.energy)
     trace = []
     while (act := next_actor(q5)) is not None:
         trace.append((act.pass_no, act.energy))
-        end_turn(q5, act, 10)            # a 10-Energy attack each time
+        end_turn(q5, act, 10)  # a 10-Energy attack each time
     assert trace == [(0, 18), (0, 8), (1, 8)], f"unexpected Pass trace: {trace}"
     assert solo.score == -2 and solo.pass_no == 2, (solo.score, solo.pass_no)
 
@@ -270,9 +289,10 @@ def demo() -> None:
     idle = _TestActor(2, 8, 4)
     idle.score = idle.energy = 12
     q6 = BucketQueue()
-    end_pass(q6, idle)                   # a Behavior Tree root returned FAILURE
-    assert (idle.score, idle.energy, idle.pass_no) == (2, 2, 1), \
+    end_pass(q6, idle)  # a Behavior Tree root returned FAILURE
+    assert (idle.score, idle.energy, idle.pass_no) == (2, 2, 1), (
         f"end_pass must advance the Pass without charging: {(idle.score, idle.energy, idle.pass_no)}"
+    )
     assert len(q6) == 1, "the actor must be re-inserted at its next Pass"
 
     # ---- 7. a whole Round where every tree fails still terminates ------------------------
@@ -295,20 +315,23 @@ def demo() -> None:
     assert cd.bt.cooldowns == {"call_backup": 2}, f"cooldowns wrong: {cd.bt.cooldowns}"
 
     # ---- 9. Improved Reflexes buys dice, capped at +2 -----------------------------------
-    plain, reflexed, overkill = _TestActor(1, 4, 4), _TestActor(2, 4, 4, reflexes=2), \
-        _TestActor(3, 4, 4, reflexes=9)
+    plain, reflexed, overkill = (
+        _TestActor(1, 4, 4),
+        _TestActor(2, 4, 4, reflexes=2),
+        _TestActor(3, 4, 4, reflexes=9),
+    )
     assert initiative_dice(plain) == 1 and initiative_dice(reflexed) == 3
     assert initiative_dice(overkill) == 1 + INITIATIVE_DICE_MAX, "the bonus dice must be capped"
     r = random.Random(1)
     begin_round([plain], r)
     assert plain.score == plain.energy, "Energy is initialised from the Initiative Score"
     assert plain.pass_no == 0, "a fresh Round starts in Pass 0"
-    assert 8 + 1 <= plain.score <= 8 + 6, plain.score      # Reaction 4 + Intuition 4 + 1d6
+    assert 8 + 1 <= plain.score <= 8 + 6, plain.score  # Reaction 4 + Intuition 4 + 1d6
 
     # ---- 10. begin_round resets Pass state and is RNG-deterministic ---------------------
     cast = [_TestActor(i, 5, 4, reflexes=1) for i in range(4)]
     for a in cast:
-        a.pass_no = 7                     # stale state must be cleared
+        a.pass_no = 7  # stale state must be cleared
     first = run_round(BucketQueue(), cast, random.Random(99))
     second = run_round(BucketQueue(), cast, random.Random(99))
     assert first == second, "the same seed must produce the same Round"
@@ -316,8 +339,10 @@ def demo() -> None:
     third = run_round(BucketQueue(), cast, random.Random(100))
     assert third != first or len(third) != len(first), "a different seed should differ somewhere"
 
-    print(f"OK  scheduler: bucket/heap agree on {50} random casts, Pass trace {trace}, "
-          f"FAILURE path charges nothing, a {len(first)}-action Round is reproducible")
+    print(
+        f"OK  scheduler: bucket/heap agree on {50} random casts, Pass trace {trace}, "
+        f"FAILURE path charges nothing, a {len(first)}-action Round is reproducible"
+    )
 
 
 if __name__ == "__main__":

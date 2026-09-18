@@ -52,7 +52,6 @@ attempt is how one bad layout leaks into the next.
 from __future__ import annotations
 
 import random
-
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Final
@@ -137,9 +136,7 @@ class Site:
     spawn: Coord
     exit_cell: Coord
     attempts: int = 1  # which attempt succeeded; >1 means retries happened
-    used_fallback: bool = (
-        False  # True when the spine layout was used (a bug report, not a win)
-    )
+    used_fallback: bool = False  # True when the spine layout was used (a bug report, not a win)
     carved: set[Coord] = field(default_factory=set)  # cells the generator carved
 
     def room_of(self, node_id: int) -> Room:
@@ -213,8 +210,7 @@ def _finish(
     return site
 
 
-def _split(x: int, y: int, w: int, h: int, sizes: list[tuple[int, int]],
-           rng: random.Random):
+def _split(x: int, y: int, w: int, h: int, sizes: list[tuple[int, int]], rng: random.Random):
     """
     Size-aware BSP. Returns a leaf per room, IN ROOM ORDER, or None if this rect cannot host them.
 
@@ -256,8 +252,7 @@ def _split(x: int, y: int, w: int, h: int, sizes: list[tuple[int, int]],
 # ======================================================================================
 # YOURS: the generator
 # ======================================================================================
-def bsp_leaves(width: int, height: int, sizes: Sequence[tuple[int, int]],
-               rng: random.Random):
+def bsp_leaves(width: int, height: int, sizes: Sequence[tuple[int, int]], rng: random.Random):
     """One leaf per room, in room order, or None when the map cannot host them."""
     return _split(0, 0, width, height, list(sizes), rng)
 
@@ -273,7 +268,7 @@ def place_rooms(
     if len(leaves) != len(nodes):
         raise EmbedError(f"{len(leaves)} leaves for {len(nodes)} nodes")
     rooms: dict[int, Room] = {}
-    for nid, (lx, ly, lw, lh) in zip(nodes, leaves):
+    for nid, (lx, ly, lw, lh) in zip(nodes, leaves, strict=True):
         rw, rh = _room_size(graph, graph.nodes[nid].kind)
         if rw + 2 * WALL_MARGIN > lw or rh + 2 * WALL_MARGIN > lh:
             raise EmbedError(f"node {nid} needs {rw}x{rh}, leaf is {lw}x{lh}")
@@ -344,9 +339,7 @@ def embed(
     return site
 
 
-def spine_layout(
-    graph: MissionGraph, width: int = SITE_W, height: int = SITE_H
-) -> Site:
+def spine_layout(graph: MissionGraph, width: int = SITE_W, height: int = SITE_H) -> Site:
     """The fallback: rooms left-to-right in graph depth order at fixed y, straight corridors.
 
     Guaranteed connected by construction, and therefore cannot fail verification.
@@ -374,9 +367,7 @@ def spine_layout(
 
     # Side rooms in a second column, still beside their parent, so each correidor stays a short
     # direct L. Nothing measured by verify() lives in this column.
-    right_x = (
-        WALL_MARGIN + max(_room_size(graph, graph.nodes[n].kind)[0] for n in spine) + 1
-    )
+    right_x = WALL_MARGIN + max(_room_size(graph, graph.nodes[n].kind)[0] for n in spine) + 1
     cursor = WALL_MARGIN
     for nid in side:
         rw, rh = _room_size(graph, graph.nodes[nid].kind)
@@ -416,9 +407,7 @@ def verify(site: Site, graph: MissionGraph) -> list[str]:
             else ROOM_INTERIOR.get(node.kind)
         )
         if want and (room.w, room.h) != want:
-            bad.append(
-                f"node {nid} ({node.kind}) room is {room.w}x{room.h}, expected {want}"
-            )
+            bad.append(f"node {nid} ({node.kind}) room is {room.w}x{room.h}, expected {want}")
         if len(room.cells) != room.w * room.h:
             bad.append(f"node {nid} room cell count mismatch")
 
@@ -452,9 +441,7 @@ def verify(site: Site, graph: MissionGraph) -> list[str]:
     if not rooms[entry_id].contains(*site.spawn):
         bad.append(f"spawn {site.spawn} is not inside the entry room {rooms[entry_id]}")
     if not rooms[exit_id].contains(*site.exit_cell):
-        bad.append(
-            f"exit cell {site.exit_cell} is not inside the exit room {rooms[exit_id]}"
-        )
+        bad.append(f"exit cell {site.exit_cell} is not inside the exit room {rooms[exit_id]}")
 
     # --- one corridor per graph edge, and it is reasonably direct ------------------------
     for parent, child in graph.edges():
@@ -478,15 +465,17 @@ def verify(site: Site, graph: MissionGraph) -> list[str]:
     index = {nid: i for i, nid in enumerate(ids)}
     uf = DisjointSet(len(ids))
     for parent, child in graph.edges():
-        if parent in index and child in index:
-            if a_star(m, rooms[parent].center, rooms[child].center) is not None:
-                uf.union(index[parent], index[child])
+        if (
+            parent in index
+            and child in index
+            and a_star(m, rooms[parent].center, rooms[child].center) is not None
+        ):
+            uf.union(index[parent], index[child])
     root = uf.find(index[entry_id])
     for nid in ids:
         if uf.find(index[nid]) != root:
             bad.append(f"room {nid} is in a different component from the entry")
 
-    reach = {site.spawn}
     if a_star(m, site.spawn, site.exit_cell) is None:
         bad.append("entry -> exit is not walkable as a tile path")
     for nid in ids:
@@ -529,16 +518,14 @@ def demo() -> None:
             g, site = build(job_type, seed)
             problems = verify(site, g)
             assert problems == [], f"{job_type}/{seed}: {problems}"
-            assert (
-                not site.used_fallback
-            ), f"{job_type}/{seed} fell back to the spine layout"
+            assert not site.used_fallback, f"{job_type}/{seed} fell back to the spine layout"
             sites[seed] = site
 
     # ---- 2. rooms: one per node, right sizes, inside the map, never overlapping ----------
     g, site = build("extraction", 3)
     assert len(site.rooms) == len(g.nodes)
     assert set(site.rooms) == set(g.nodes)
-    for nid, room in site.rooms.items():
+    for room in site.rooms.values():
         assert room.x >= WALL_MARGIN and room.y >= WALL_MARGIN
         assert room.x + room.w <= site.map.w - WALL_MARGIN
         assert room.y + room.h <= site.map.h - WALL_MARGIN
@@ -549,36 +536,29 @@ def demo() -> None:
             assert not site.rooms[a].intersects(site.rooms[b]), f"rooms {a}/{b} overlap"
     assert site.rooms[g.single(ENTRY)].w == 10, "entry rooms are 10 wide"
     assert site.rooms[g.single(EXIT)].w == 10
-    assert (
-        site.rooms[g.of_kind(OBJECTIVE)[0]].w == 14
-    ), "the extraction vault is the largest room"
+    assert site.rooms[g.of_kind(OBJECTIVE)[0]].w == 14, "the extraction vault is the largest room"
 
     # ---- 3. every room is walkable from the spawn, and the corridors are direct ----------
     for nid, room in site.rooms.items():
-        assert (
-            a_star(site.map, site.spawn, room.center) is not None
-        ), f"room {nid} unreachable"
+        assert a_star(site.map, site.spawn, room.center) is not None, f"room {nid} unreachable"
     for parent, child in g.edges():
         c1, c2 = site.rooms[parent].center, site.rooms[child].center
         manhattan = abs(c1[0] - c2[0]) + abs(c1[1] - c2[1])
         path = a_star(site.map, c1, c2)
-        assert (
-            path is not None and len(path) - 1 <= manhattan + 4
-        ), f"corridor {parent}->{child} wanders ({len(path) - 1} steps vs {manhattan})"
+        assert path is not None, f"no corridor {parent}->{child}"
+        assert len(path) - 1 <= manhattan + 4, (
+            f"corridor {parent}->{child} wanders ({len(path) - 1} steps vs {manhattan})"
+        )
 
     # ---- 4. the vault is not next to the entrance (ADR-0011's named failure) ------------
     entry_c = site.rooms[g.single(ENTRY)].center
     for o in g.of_kind(OBJECTIVE):
-        d = abs(site.rooms[o].center[0] - entry_c[0]) + abs(
-            site.rooms[o].center[1] - entry_c[1]
-        )
+        d = abs(site.rooms[o].center[0] - entry_c[0]) + abs(site.rooms[o].center[1] - entry_c[1])
         assert d >= MIN_OBJECTIVE_DISTANCE, f"objective is only {d} from the entry"
 
     # ---- 5. determinism, and that the seed actually changes the Site --------------------
     _, again = build("extraction", 3)
-    assert bytes(again.map.tiles) == bytes(
-        site.map.tiles
-    ), "the same seed must give the same Site"
+    assert bytes(again.map.tiles) == bytes(site.map.tiles), "the same seed must give the same Site"
     assert again.rooms == site.rooms
     layouts = set()
     for seed in range(20):
@@ -589,9 +569,7 @@ def demo() -> None:
                 tuple(sorted((n, r.x, r.y) for n, r in s.rooms.items())),
             )
         )
-    assert (
-        len(layouts) > 1
-    ), "20 seeds produced one identical Site: the seed is being ignored"
+    assert len(layouts) > 1, "20 seeds produced one identical Site: the seed is being ignored"
 
     # ---- 6. the generator refuses impossible geometry instead of returning junk ---------
     g_small = build_graph("courier", random.Random(1))
@@ -600,9 +578,7 @@ def demo() -> None:
     except EmbedError:
         pass
     else:
-        raise AssertionError(
-            "a 12x12 map cannot hold 5 rooms and must raise EmbedError"
-        )
+        raise AssertionError("a 12x12 map cannot hold 5 rooms and must raise EmbedError")
 
     # ---- 7. the fallback verifies for EVERY graph, not just the one above ---------------
     # Seeding this with one graph hid a real bug: sabotage has two objectives, main_path() routes
@@ -615,12 +591,10 @@ def demo() -> None:
             fb_problems = verify(fb, fb_graph)
             assert fb_problems == [], f"{job_type}/{seed} spine layout: {fb_problems}"
     fallback = spine_layout(g)
-    assert (
-        verify(fallback, g) == []
-    ), f"the spine layout must verify: {verify(fallback, g)}"
-    assert (
-        fallback.used_fallback is True
-    ), "the fallback must be flagged, never passed off as normal"
+    assert verify(fallback, g) == [], f"the spine layout must verify: {verify(fallback, g)}"
+    assert fallback.used_fallback is True, (
+        "the fallback must be flagged, never passed off as normal"
+    )
 
     # ---- 8. the Oracle can fail: break a Site and watch verify() complain ---------------
     def clone(s: Site) -> Site:
@@ -653,8 +627,7 @@ def demo() -> None:
     # alternate routes, so the Site stays connected and the test passes for the wrong reason. The
     # ring seals every way in at once. (Found by running it.)
     assert any(
-        "different component" in p or "unreachable" in p or "not walkable" in p
-        for p in problems
+        "different component" in p or "unreachable" in p or "not walkable" in p for p in problems
     ), f"sealing the entry room must be caught: {problems}"
 
     # (b) overlap two rooms -> the overlap rule must fire
@@ -665,9 +638,7 @@ def demo() -> None:
     shoved.rooms[b_room.node_id] = moved
     for x, y in moved.cells:
         shoved.map.tiles[shoved.map.idx(x, y)] = TILE_FLOOR
-    assert any(
-        "overlap" in p for p in verify(shoved, g)
-    ), "overlapping rooms must be caught"
+    assert any("overlap" in p for p in verify(shoved, g)), "overlapping rooms must be caught"
 
     # (c) wrong room size -> the sizing rule must fire
     resized = clone(site)

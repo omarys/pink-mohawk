@@ -46,7 +46,7 @@ class DisjointSet:
         root = a
         while parent[root] != root:
             root = parent[root]
-        while parent[a] != root:          # second pass: point everything straight at the root
+        while parent[a] != root:  # second pass: point everything straight at the root
             parent[a], a = root, parent[a]
         return root
 
@@ -55,7 +55,7 @@ class DisjointSet:
         ra, rb = self.find(a), self.find(b)
         if ra == rb:
             return False
-        if self.size[ra] < self.size[rb]:       # attach the smaller tree under the larger
+        if self.size[ra] < self.size[rb]:  # attach the smaller tree under the larger
             ra, rb = rb, ra
         self.parent[rb] = ra
         self.size[ra] += self.size[rb]
@@ -91,15 +91,17 @@ def demo() -> None:
 
     # union by size: attaching a singleton to a big tree must not deepen it
     d2 = DisjointSet(5)
-    d2.union(0, 1); d2.union(0, 2); d2.union(0, 3)   # 0 is the big root
-    d2.union(4, 3)                                    # 4 attaches under 0, not the reverse
+    d2.union(0, 1)
+    d2.union(0, 2)
+    d2.union(0, 3)  # 0 is the big root
+    d2.union(4, 3)  # 4 attaches under 0, not the reverse
     assert d2.find(4) == 0, "the smaller tree must hang under the larger"
 
     # depth stays flat: chain n singletons together, then two full find passes
     n = 10_000
     d3 = DisjointSet(n)
     for i in range(n - 1):
-        d3.union(i, i + 1)          # 0..n-1 ends as one set
+        d3.union(i, i + 1)  # 0..n-1 ends as one set
     assert d3.count == 1
 
     def depth() -> int:
@@ -112,9 +114,9 @@ def demo() -> None:
             worst = max(worst, h)
         return worst
 
-    d3.find(0)                       # touch one end
+    d3.find(0)  # touch one end
     after_one = depth()
-    for i in range(0, n, 97):        # sparse second pass, enough to flatten
+    for i in range(0, n, 97):  # sparse second pass, enough to flatten
         d3.find(i)
     after_two = depth()
     assert after_two <= 2, f"path compression failed to flatten: depth {after_two}"
@@ -125,8 +127,10 @@ def demo() -> None:
     assert len(comps) == d.count
     assert sum(len(v) for v in comps.values()) == 6
 
-    print(f"OK  DisjointSet: {n} chained unions -> depth {after_one} then {after_two} after "
-          f"compression, count={d.count}")
+    print(
+        f"OK  DisjointSet: {n} chained unions -> depth {after_one} then {after_two} after "
+        f"compression, count={d.count}"
+    )
 
 
 if __name__ == "__main__":

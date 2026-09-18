@@ -28,9 +28,9 @@ class TileMap:
     def __init__(self, w: int, h: int) -> None:
         self.w = w
         self.h = h
-        self.tiles = bytearray(w * h)       # terrain id; 0 = wall
-        self.explored = bytearray(w * h)    # has this cell ever been seen this Run? (Memory)
-        self.visible = bytearray(w * h)     # is this cell visible right now? (FOV)
+        self.tiles = bytearray(w * h)  # terrain id; 0 = wall
+        self.explored = bytearray(w * h)  # has this cell ever been seen this Run? (Memory)
+        self.visible = bytearray(w * h)  # is this cell visible right now? (FOV)
 
     # -- indexing -------------------------------------------------------------------------
     def idx(self, x: int, y: int) -> int:
