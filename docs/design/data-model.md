@@ -1696,6 +1696,10 @@ if __name__ == "__main__":
 **Crew**), an enemy, a **Spirit** (conjured by the Shaman, §7), a **device** (hacked by the
 Decker, §7), and an item. The model below says how they relate.
 
+The **`Blackboard`** named on `Actor` below is the twelve typed keys of `ai.md` §5, defined in
+`entities.py` rather than `ai.py` because `Actor` carries one and the layer law stops layer 2
+importing layer 3.
+
 ### The split: Actors vs WorldObjects
 
 > **Only things that take turns are Actors.**
@@ -1736,15 +1740,17 @@ class Actor:
     physical: Monitor             # §4: max = 8 + ceil(Body / 2)
     stun: Monitor                 # §4: max = 8 + ceil(Willpower / 2)
     cover: int = 0                # §4: +2 while in cover
-    effects: list[Effect] = ()    # §6/§7 durations: blinded, burning, hacked, sustaining…
+    effects: list[Effect] = field(default_factory=list)    # §6/§7 durations: blinded, burning, hacked, sustaining…
     score: int = 0                # §5: Initiative Score for the current Round
     energy: int = 0               # §5: Energy left in the current Pass
     pass_no: int = 0              # §5
     improved_reflexes_dice: int = 0   # §6: Qi Improved Reflexes adds 1d6 (§5 caps at +2d6)
-    gear: list[DeviceRef] = ()    # §7: carried devices that the Decker can hack
+    gear: list[DeviceRef] = field(default_factory=list)    # §7: carried devices that the Decker can hack
     role: RunnerRole | EnemyRole | SpiritRole | None = None
     bt: BTState | None = None     # None <=> player-controlled (the four Runners, §7)
     bb: Blackboard | None = None
+    visible: bytearray | None = None   # DECISIONS 33: per-actor FOV, 3.6KB each; the map's own
+                                       # array belongs to the renderer and nothing else writes it
 
 @dataclass
 class Monitor:                    # §4
@@ -1759,7 +1765,7 @@ class RunnerRole:                 # §7
     edge: int = 3                 # §6
     qi: int = 0                   # §6, Adept only
     tradition: str | None = None  # §6: "Logic" (Mage/Decker) or "Charisma" (Shaman)
-    inventory: list[ItemRef] = ()
+    inventory: list[ItemRef] = field(default_factory=list)
     xp: int = 0                   # §2 Growth
     perks: list[str] = ()
     sustaining: list[str] = ()    # §6: each costs −2 dice
@@ -1816,7 +1822,7 @@ not systems" expressed in the model.
 |---|---|---|
 | build a Run (≤ 48 actors, each a dataclass) | O(n) | O(n) |
 | occupancy lookup | O(1) via a `dict[(x,y)] -> actor_id` index rebuilt on move | O(n) |
-| all actor components | — | O(n) ≈ 48 objects, tens of KB |
+| all actor components | — | O(n) ≈ 48 objects, tens of KB, plus a 3.6KB `visible` buffer each (~170KB) |
 | serialize/deserialize the crew | O(n) | O(n) |
 
 An **occupancy index** (`dict[cell, actor_id]`) is maintained by the Run beside the actor list, so
@@ -1839,7 +1845,7 @@ if __name__ == "__main__":
                        attrs=dict.fromkeys(ATTRS, 3), skills=dict.fromkeys(SKILLS, 3),
                        physical=Monitor(0), stun=Monitor(0),
                        role=SpiritRole(summoner_id=1, spirit_type="beast"),
-                       bt=BTState(tree=Node(ACTION)))
+                       bt=BTState())    # BTState holds per-actor state only; the parsed tree is shared and passed to tick()
         # ---- a Spirit is a full Actor: it has Energy and a tree ------------------------------
         assert spirit.bt is not None and spirit.energy == 0
         assert spirit.role.rounds_left == 3 and spirit.role.hostile is False
