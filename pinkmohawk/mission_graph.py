@@ -350,7 +350,7 @@ def demo() -> None:
             assert g.validate() == [], f"{job_type}/{seed}: {g.validate()}"
             assert g.is_dag(), "a generated graph must be acyclic"
             assert len(g.of_kind(ENTRY)) == 1 and len(g.of_kind(EXIT)) == 1
-            assert 1 <= len(g.of_kind(SECURITY)) <= 3 + 1, len(g.of_kind(SECURITY))
+            assert 1 <= len(g.of_kind(SECURITY)) <= 3, len(g.of_kind(SECURITY))
             assert len(g.of_kind(OBJECTIVE)) == cfg["objectives"]
             assert len(g.of_kind(SIDE)) <= cfg["side_max"] * SIDE_CHAIN_MAX
             length = g.shortest_path_len(g.single(ENTRY), g.single(EXIT))

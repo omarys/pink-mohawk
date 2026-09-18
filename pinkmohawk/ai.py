@@ -167,7 +167,7 @@ def morale(actor: Actor, world: World) -> int:
     allies_down = sum(
         1 for a in world.actors if a.faction == actor.faction and a.id != actor.id and a.downed
     )
-    wounds = -((actor.physical.filled + actor.stun.filled) // 3)
+    wounds = actor.wound_modifier
     return wounds + bonus - allies_down
 
 
@@ -204,7 +204,7 @@ def refresh(actor: Actor, world: World) -> None:
         candidates = [
             (other.id, candidate_facts(actor, other, world))
             for other in world.living()
-            if other.faction != actor.faction and other.pos
+            if other.faction != actor.faction
         ]
         incumbent = bb.target
         bb.target = choose(weights_for(actor), candidates, incumbent=incumbent)
@@ -378,8 +378,7 @@ def check_low_morale(actor: Actor, args: Mapping[str, Any], world: World) -> boo
 
 
 def check_wound_modifier_at_most(actor: Actor, args: Mapping[str, Any], world: World) -> bool:
-    wounds = -((actor.physical.filled + actor.stun.filled) // 3)
-    return wounds <= int(args["value"])
+    return actor.wound_modifier <= int(args["value"])
 
 
 def check_noise_heard(actor: Actor, args: Mapping[str, Any], world: World) -> bool:
@@ -917,7 +916,8 @@ def demo() -> None:
     guard.energy -= attack_ctx.cost
     assert world.clock.segments == clock_before + 2, "gunfire ticks the Clock"
     assert world.ammo[(1, "heavy_pistol")] == 14, "a round leaves the magazine"
-    assert runner.physical.filled + runner.stun.filled >= 0  # damage may or may not land
+    # Damage itself is rules.demo's rule to assert (soak, overflow, box-marking). What this demo
+    # owns is that firing reached the world: the Clock tick and the magazine above.
 
     # ---- 5. actions that move: one Step per decision step, RUNNING until arrival ---------
     guard.pos = (5, 5)

@@ -44,7 +44,6 @@ from .constants import (
     THRESHOLDS,
     TRADITION_ATTRIBUTE,
     WEAPONS,
-    WOUND_PENALTY_PER_BOXES,
 )
 from .entities import Actor, RunnerRole
 from .errors import ValidationError
@@ -356,8 +355,12 @@ def sustain_penalty(sustaining: int) -> int:
 
 
 def wound_modifier(actor: Actor) -> int:
-    """§4: −1 die per 3 filled boxes, counting both tracks together."""
-    return -((actor.physical.filled + actor.stun.filled) // WOUND_PENALTY_PER_BOXES)
+    """§4: −1 die per 3 filled boxes, counting both tracks together.
+
+    Delegates: `Actor.wound_modifier` is the one implementation, because four copies of one
+    formula is how a contract drifts.
+    """
+    return actor.wound_modifier
 
 
 def charge(actor: Actor, action_key: str, times: int = 1) -> int:

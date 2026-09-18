@@ -647,7 +647,9 @@ def demo() -> None:
     for x, y in resized.rooms[ids2[0]].cells:
         if resized.map.in_bounds(x, y):
             resized.map.tiles[resized.map.idx(x, y)] = TILE_FLOOR
-    assert verify(resized, g), "a room that is the wrong size must be caught"
+    assert any("expected" in p for p in verify(resized, g)), (
+        "the sizing rule must be the complaint, not an overlap or an unreachable room"
+    )
 
     print(
         f"OK  embed: {len(JOB_GRAPH)} job types x 12 seeds verify, retry raises on impossible "

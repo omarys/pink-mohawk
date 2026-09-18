@@ -24,7 +24,7 @@ from typing import Any
 
 from .ai import load_trees
 from .bt import BTState
-from .constants import ATTRIBUTES, MAGAZINES, SKILLS
+from .constants import ATTRIBUTES, DEVICE_RATINGS, MAGAZINES, SKILLS
 from .entities import (
     Actor,
     Blackboard,
@@ -64,7 +64,7 @@ def _monitors() -> tuple[Monitor, Monitor]:
 
 
 def _gear(carried: list[str]) -> list[DeviceRef]:
-    return [DeviceRef(kind, max(2, min(4, 3))) for kind in carried]
+    return [DeviceRef(kind, DEVICE_RATINGS[kind]) for kind in carried]
 
 
 def build_enemy(spawn: Spawn, actor_id: int, rng: random.Random) -> Actor:

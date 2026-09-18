@@ -26,7 +26,16 @@ import numpy as np
 import tcod.console
 import tcod.tileset
 
-from .constants import SITE_H, SITE_W, TILE_FLOOR, TILE_WALL, UI_ROWS, VIEW_H, VIEW_W
+from .constants import (
+    CLOCK_SEGMENTS,
+    SITE_H,
+    SITE_W,
+    TILE_FLOOR,
+    TILE_WALL,
+    UI_ROWS,
+    VIEW_H,
+    VIEW_W,
+)
 from .entities import Actor
 from .run import RunState
 
@@ -169,11 +178,11 @@ def _draw_ui(console: tcod.console.Console, run: RunState) -> None:
         console.rgb["bg"][row, :] = UI_BG
 
     segments = run.clock.segments
-    bar = "#" * segments + "-" * (10 - segments)
+    bar = "#" * segments + "-" * (CLOCK_SEGMENTS - segments)
     console.print(
         1,
         top + 1,
-        f"CLOCK [{bar}] {segments}/10  {run.clock.state.value.upper()}",
+        f"CLOCK [{bar}] {segments}/{CLOCK_SEGMENTS}  {run.clock.state.value.upper()}",
         fg=(255, 200, 120),
         bg=UI_BG,
     )

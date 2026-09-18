@@ -26,6 +26,7 @@ from dataclasses import dataclass, field
 from typing import Final
 
 from .constants import (
+    DEVICE_CARRY_CAP,
     DEVICE_RATINGS,
     HACK_DRAIN_DIVISOR,
     HACK_DRAIN_PER_NODE_CAP,
@@ -190,7 +191,6 @@ CARRIED_DEVICES: Final[dict[str, tuple[str, ...]]] = {
     "hellhound": (),
 }
 
-CARRY_CAP: Final = 3
 
 #: Side-node loot, one weighted draw. v1 content: the cheap consumables from §4/§9.
 LOOT_TABLE: Final[tuple[tuple[str, int], ...]] = (
@@ -350,9 +350,9 @@ def validate(population: Population, graph: MissionGraph) -> list[str]:
 
     # G2 cap 1, and unknown devices/archetypes
     for spawn in population.enemies():
-        if len(spawn.carried) > CARRY_CAP:
+        if len(spawn.carried) > DEVICE_CARRY_CAP:
             bad.append(
-                f"G2: {spawn.template} carries {len(spawn.carried)} devices, cap {CARRY_CAP}"
+                f"G2: {spawn.template} carries {len(spawn.carried)} devices, cap {DEVICE_CARRY_CAP}"
             )
         for kind in spawn.carried:
             if kind not in DEVICE_RATINGS:

@@ -221,10 +221,6 @@ class Actor:
             raise ValidationError([f"unknown faction {self.faction!r}; known: {list(FACTIONS)}"])
         if not 0 <= self.facing <= 7:
             raise ValidationError([f"facing must be 0..7, got {self.facing}"])
-        if self.visible is None:
-            # Allocated lazily by whoever knows the map size; None means "never looked yet", which is
-            # different from "looked and saw nothing".
-            self.visible = None
 
     # -- derived values, so callers never re-derive the monitor maxima -------------------
     @property
