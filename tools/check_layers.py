@@ -29,6 +29,12 @@ ALGORITHM_MODULES = {
 }
 FORBIDDEN_FOR_ALGORITHMS = {"entities.py", "rules.py", "security.py"}
 
+# The dialogue engine cannot be an algorithm: it resolves `attr.logic` and `rep.fixer`, so it needs the
+# domain. But it takes its host injected, which buys the same property the algorithm layer has — its
+# demo runs a whole conversation against a stub, with no Hub, no save and no campaign state. That only
+# holds while it does not import the concrete host, so the seam is checked rather than trusted.
+DECOUPLED_MODULES = {"dialogue.py": {"campaign.py", "save.py", "hub.py"}}
+
 
 def imported_modules(path: pathlib.Path) -> set[str]:
     """Top-level module names imported by a file, via AST rather than regex."""
@@ -60,6 +66,14 @@ def main() -> int:
             illegal = imports & FORBIDDEN_FOR_ALGORITHMS
             if illegal:
                 failures.append(f"{path.name}: algorithm imports the domain ({sorted(illegal)})")
+
+        if path.name in DECOUPLED_MODULES:
+            coupled = imports & DECOUPLED_MODULES[path.name]
+            if coupled:
+                failures.append(
+                    f"{path.name}: imports its own host ({sorted(coupled)}), so its demo can no "
+                    f"longer run against a stub"
+                )
 
     # the renderer seam should also be discoverable by plain grep, as a second opinion on the AST
     grep_hits = {
