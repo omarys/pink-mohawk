@@ -1,0 +1,121 @@
+{
+  "id": "corp_guard",
+  "archetype": "corp guard",
+  "root": {
+    "type": "selector",
+    "children": [
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "alert_below",
+            "args": {
+              "level": 2
+            }
+          },
+          {
+            "type": "condition",
+            "check": "can_see_target"
+          },
+          {
+            "type": "action",
+            "action": "call_backup"
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "low_morale"
+          },
+          {
+            "type": "action",
+            "action": "retreat",
+            "args": {
+              "dest": "home"
+            }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "can_see_target"
+          },
+          {
+            "type": "condition",
+            "check": "in_weapon_range",
+            "args": {
+              "weapon": "assault_rifle"
+            }
+          },
+          {
+            "type": "condition",
+            "check": "not_blocked_by_ally"
+          },
+          {
+            "type": "action",
+            "action": "attack_target",
+            "args": {
+              "weapon": "assault_rifle"
+            }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "has_target"
+          },
+          {
+            "type": "action",
+            "action": "seek_cover"
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "has_last_known_pos"
+          },
+          {
+            "type": "action",
+            "action": "move_to_blackboard",
+            "args": {
+              "key": "last_known_pos"
+            }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "noise_heard"
+          },
+          {
+            "type": "action",
+            "action": "move_to_blackboard",
+            "args": {
+              "key": "noise_pos"
+            }
+          }
+        ]
+      },
+      {
+        "type": "action",
+        "action": "patrol"
+      }
+    ]
+  }
+}

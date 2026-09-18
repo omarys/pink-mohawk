@@ -1,0 +1,46 @@
+{
+  "id": "hellhound",
+  "archetype": "hellhound",
+  "root": {
+    "type": "selector",
+    "children": [
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "can_see_target"
+          },
+          {
+            "type": "condition",
+            "check": "in_melee_range"
+          },
+          {
+            "type": "action",
+            "action": "attack_target",
+            "args": {
+              "weapon": "hellhound_bite"
+            }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "has_last_known_pos"
+          },
+          {
+            "type": "action",
+            "action": "track_by_scent"
+          }
+        ]
+      },
+      {
+        "type": "action",
+        "action": "patrol"
+      }
+    ]
+  }
+}

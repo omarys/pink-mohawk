@@ -1,0 +1,52 @@
+{
+  "id": "security_drone",
+  "archetype": "security drone",
+  "root": {
+    "type": "selector",
+    "children": [
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "can_see_target"
+          },
+          {
+            "type": "condition",
+            "check": "in_weapon_range",
+            "args": {
+              "weapon": "smg"
+            }
+          },
+          {
+            "type": "action",
+            "action": "attack_target",
+            "args": {
+              "weapon": "smg"
+            }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "has_last_known_pos"
+          },
+          {
+            "type": "action",
+            "action": "move_to_blackboard",
+            "args": {
+              "key": "last_known_pos"
+            }
+          }
+        ]
+      },
+      {
+        "type": "action",
+        "action": "patrol"
+      }
+    ]
+  }
+}

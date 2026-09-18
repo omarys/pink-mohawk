@@ -1,0 +1,85 @@
+{
+  "id": "corp_mage",
+  "archetype": "corp mage",
+  "root": {
+    "type": "selector",
+    "children": [
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "can_see_target"
+          },
+          {
+            "type": "condition",
+            "check": "in_weapon_range",
+            "args": {
+              "weapon": "heavy_pistol"
+            }
+          },
+          {
+            "type": "action",
+            "action": "attack_target",
+            "args": {
+              "weapon": "heavy_pistol"
+            }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "can_see_target"
+          },
+          {
+            "type": "action",
+            "action": "use_power",
+            "args": {
+              "power": "manabolt",
+              "force": 4
+            }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "wound_modifier_at_most",
+            "args": {
+              "value": -2
+            }
+          },
+          {
+            "type": "action",
+            "action": "retreat",
+            "args": {
+              "dest": "home"
+            }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "has_target"
+          },
+          {
+            "type": "action",
+            "action": "seek_cover"
+          }
+        ]
+      },
+      {
+        "type": "action",
+        "action": "patrol"
+      }
+    ]
+  }
+}

@@ -40,6 +40,9 @@ from .constants import (
     FOV_RADIUS_DARK,
     MAGAZINES,
     NOISE_RADIUS,
+    SPELL_RANGE,
+    SPIRIT_ATTACKS,
+    WEAPONS,
 )
 from .entities import Actor, Effect, EnemyRole, RunnerRole, SpiritRole
 from .errors import ValidationError
@@ -51,6 +54,7 @@ from .rules import (
     apply_damage,
     damage_type,
     drain_value,
+    opposed,
     resist_drain,
     roll,
     weapon_damage,
@@ -569,7 +573,11 @@ def act_attack_target(
 
     target = world.by_id(_bb(actor).target)
     weapon = args.get("weapon")
-    if target is None or not isinstance(weapon, str) or weapon not in MAGAZINES:
+    if (
+        target is None
+        or not isinstance(weapon, str)
+        or (weapon not in WEAPONS and not any(a[0] == weapon for a in SPIRIT_ATTACKS.values()))
+    ):
         return Status.FAILURE
     if _ammo_key(actor, weapon) in world.ammo and world.ammo[_ammo_key(actor, weapon)] <= 0:
         return Status.FAILURE  # prerequisites before Energy (ai.md §7)
@@ -600,10 +608,37 @@ def act_attack_target(
     return Status.SUCCESS
 
 
-#: The powers a brain may use in v1. The kits in classes.md land with the content pass.
+def power_manabolt(actor: Actor, args: Mapping[str, Any], ctx: TickContext, world: World) -> Status:
+    """The Corp Mage's attack: direct combat magic (classes.md §4).
+
+    Spell defence is Intuition + Willpower, and net hits add to the Force-scaled DV like any other
+    attack. Drain is the caller's business (`act_use_power`): Drain is what casting *costs*, not what
+    the spell does.
+    """
+    target = world.by_id(_bb(actor).target)
+    force = int(args.get("force") or 0)
+    if target is None or not 1 <= force <= 8:
+        return Status.FAILURE
+    if chebyshev(actor.pos, target.pos) > SPELL_RANGE or not has_los(
+        world.map, actor.pos, target.pos
+    ):
+        return Status.FAILURE
+    atk = roll(actor.attrs["logic"] + actor.skills["sorcery"], world.rng)
+    dfn = roll(target.attrs["willpower"] + target.attrs["intuition"], world.rng)
+    net = opposed(atk, dfn).net
+    if net > 0:
+        apply_damage(target, "P", force + net)
+    if force >= 4:
+        world.clock.tick("loud_spell")  # §9: a loud spell is worth 2 segments
+        broadcast(world, actor.pos, "loud_spell")
+    return Status.SUCCESS
+
+
+#: The powers a brain may use in v1. The rest of the classes.md kits land with the Shaman and Decker
+#: content passes; `act_use_power` refuses an unknown power rather than half-casting it.
 POWER_HANDLERS: Final[
     dict[str, Callable[[Actor, Mapping[str, Any], TickContext, World], Status]]
-] = {}
+] = {"manabolt": power_manabolt}
 
 
 def act_use_power(actor: Actor, args: Mapping[str, Any], ctx: TickContext, world: World) -> Status:

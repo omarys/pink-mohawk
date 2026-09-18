@@ -1,0 +1,117 @@
+{
+  "_note": "Stat blocks from docs/design/enemies.md section 1. `skills` is a flat rating in v1; the full per-skill table is in that document. `carries` is capped at 3 by DECISIONS \u00a77.",
+  "corp_guard": {
+    "attrs": {
+      "body": 4,
+      "agility": 3,
+      "reaction": 4,
+      "strength": 3,
+      "willpower": 3,
+      "logic": 2,
+      "intuition": 3,
+      "charisma": 3,
+      "edge": 1
+    },
+    "skills": 3,
+    "armour": 8,
+    "weapon": "assault_rifle",
+    "magazine": 30,
+    "flees_at": -4,
+    "carries": [
+      "gun",
+      "optics",
+      "commlink"
+    ],
+    "glyph": 57360
+  },
+  "security_drone": {
+    "attrs": {
+      "body": 4,
+      "agility": 4,
+      "reaction": 5,
+      "strength": 2,
+      "willpower": 3,
+      "logic": 3,
+      "intuition": 4,
+      "charisma": 1,
+      "edge": 0
+    },
+    "skills": 3,
+    "armour": 4,
+    "weapon": "smg",
+    "magazine": 30,
+    "flees_at": null,
+    "carries": [
+      "drone",
+      "optics",
+      "gun"
+    ],
+    "glyph": 57361
+  },
+  "ganger": {
+    "attrs": {
+      "body": 4,
+      "agility": 4,
+      "reaction": 3,
+      "strength": 4,
+      "willpower": 2,
+      "logic": 1,
+      "intuition": 2,
+      "charisma": 3,
+      "edge": 1
+    },
+    "skills": 3,
+    "armour": 6,
+    "weapon": "katana",
+    "magazine": 0,
+    "flees_at": -3,
+    "carries": [
+      "gun"
+    ],
+    "glyph": 57362
+  },
+  "corp_mage": {
+    "attrs": {
+      "body": 3,
+      "agility": 3,
+      "reaction": 3,
+      "strength": 3,
+      "willpower": 5,
+      "logic": 5,
+      "intuition": 4,
+      "charisma": 4,
+      "edge": 2
+    },
+    "skills": 4,
+    "armour": 9,
+    "weapon": "heavy_pistol",
+    "magazine": 15,
+    "flees_at": -4,
+    "tradition": "mage",
+    "carries": [
+      "commlink",
+      "optics"
+    ],
+    "glyph": 57363
+  },
+  "hellhound": {
+    "attrs": {
+      "body": 5,
+      "agility": 5,
+      "reaction": 5,
+      "strength": 5,
+      "willpower": 3,
+      "logic": 1,
+      "intuition": 3,
+      "charisma": 1,
+      "edge": 0
+    },
+    "skills": 4,
+    "armour": 2,
+    "weapon": "hellhound_bite",
+    "magazine": 0,
+    "flees_at": null,
+    "carries": [],
+    "glyph": 57364
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "id": "ganger",
+  "archetype": "ganger",
+  "root": {
+    "type": "selector",
+    "children": [
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "low_morale"
+          },
+          {
+            "type": "action",
+            "action": "retreat",
+            "args": {
+              "dest": "home"
+            }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "can_see_target"
+          },
+          {
+            "type": "condition",
+            "check": "in_melee_range"
+          },
+          {
+            "type": "action",
+            "action": "attack_target",
+            "args": {
+              "weapon": "katana"
+            }
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "has_target"
+          },
+          {
+            "type": "action",
+            "action": "flank_target"
+          }
+        ]
+      },
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "has_last_known_pos"
+          },
+          {
+            "type": "action",
+            "action": "move_to_blackboard",
+            "args": {
+              "key": "last_known_pos"
+            }
+          }
+        ]
+      },
+      {
+        "type": "action",
+        "action": "patrol"
+      }
+    ]
+  }
+}

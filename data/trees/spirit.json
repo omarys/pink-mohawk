@@ -1,0 +1,36 @@
+{
+  "id": "spirit",
+  "archetype": "spirit",
+  "root": {
+    "type": "selector",
+    "children": [
+      {
+        "type": "sequence",
+        "children": [
+          {
+            "type": "condition",
+            "check": "can_see_target"
+          },
+          {
+            "type": "condition",
+            "check": "in_weapon_range",
+            "args": {
+              "weapon": "beast_strike"
+            }
+          },
+          {
+            "type": "action",
+            "action": "attack_target",
+            "args": {
+              "weapon": "beast_strike"
+            }
+          }
+        ]
+      },
+      {
+        "type": "action",
+        "action": "follow_summoner"
+      }
+    ]
+  }
+}

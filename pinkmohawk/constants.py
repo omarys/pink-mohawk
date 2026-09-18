@@ -179,6 +179,14 @@ DRAIN_FORMULAS: Final = {
 SUMMON_DRAIN_FLOOR: Final = 2  # Drain = 2 x the Spirit's Hits, minimum 2
 SPIRIT_DURATION_ROUNDS: Final = 3
 
+# DECISIONS §4: spells reach 12 cells with line of sight. A constant because two modules and a
+# spell handler all need it.
+SPELL_RANGE: Final = 12
+
+# v1 simplification: a Spirit's Force comes from its conjuring roll in the full Shaman kit; until
+# that lands, every Spirit fights at this Force. Its per-type DV offsets are in SPIRIT_ATTACKS.
+SPIRIT_FORCE_DEFAULT: Final = 3
+
 # ---------------------------------------------------------------------------
 # Device hacking — DECISIONS §7
 # ---------------------------------------------------------------------------

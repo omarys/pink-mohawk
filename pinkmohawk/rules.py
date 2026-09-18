@@ -36,6 +36,8 @@ from .constants import (
     HIT_MIN,
     OVERFLOW_STUN_PER_PHYSICAL,
     QI_POWERS,
+    SPIRIT_ATTACKS,
+    SPIRIT_FORCE_DEFAULT,
     SUMMON_DRAIN_FLOOR,
     SUSTAIN_MAX,
     SUSTAIN_PENALTY,
@@ -156,11 +158,17 @@ class Damage:
 def weapon_damage(weapon: str, strength: int) -> Damage:
     """Resolve a WEAPONS row, including the `strength+N` rows (katana, hellhound bite)."""
     row = WEAPONS.get(weapon)
-    if row is None:
-        raise ValidationError([f"unknown weapon {weapon!r}; known: {sorted(WEAPONS)}"])
-    dv, code, ap, _range = row
-    power = strength + int(dv.split("+")[1]) if isinstance(dv, str) else int(dv)
-    return Damage(power, code, ap)
+    if row is not None:
+        dv, code, ap, _range = row
+        power = strength + int(dv.split("+")[1]) if isinstance(dv, str) else int(dv)
+        return Damage(power, code, ap)
+    # A Spirit's attacks are not in WEAPONS: they scale with Force, not Strength (classes.md §7.3).
+    for _spirit_type, (ability, (offset, _b), ap, _r, is_stun) in SPIRIT_ATTACKS.items():
+        if ability == weapon:
+            return Damage(
+                SPIRIT_FORCE_DEFAULT + offset, DAMAGE_STUN if is_stun else DAMAGE_PHYSICAL, ap
+            )
+    raise ValidationError([f"unknown weapon {weapon!r}"])
 
 
 def soak_pool(actor: Actor, damage: Damage, armour: int) -> int:
