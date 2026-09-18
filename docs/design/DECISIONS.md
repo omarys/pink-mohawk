@@ -149,7 +149,7 @@ All four are in the Crew from the start; the player controls all four. No recrui
 | Shaman | conjurer | CHA 6, WIL 5 | acts through Spirits and zones |
 | Decker | fighter-technomancer | LOG 6, AGI 5 | acts on devices |
 
-**Mage** (Sorcery + Logic): Manabolt (Force DV, single target), Stunball (Force Stun, radius 2), Heal (Hits boxes), Analyze Device (reveals devices and ratings in radius), Invisibility (+3 stealth dice), Armor (+2 soak), Counterspell (opposed Sorcery test to cancel an enemy spell, range 12).
+**Mage** (Sorcery + Logic): Manabolt (Force DV, single target), Stunball (Force Stun, radius 2), Heal (Hits boxes), Analyze Device (reveals devices and ratings in radius), Invisibility (+3 stealth dice), Armor (+2 soak), Counterspell (opposed Sorcery test to cancel an enemy spell, range 12). A Caster may target **itself** with Heal, at the same Drain — a lone Corp Mage behind cover healing itself is the natural play.
 
 **Shaman** (Conjuring + Charisma): Summon Spirit, Fear (radius 2, −2 dice, 3 rounds), Ward (radius 2, −1 die to enemy magic entering it), one Totem passive chosen at creation (+1 die to a skill family). Spirit types: Beast (melee), Air (fast, ranged), Earth (tank, slow), Water (area). A failed Conjuring roll, or a Glitch, lets the Spirit break free and become hostile; a Spirit lasts 3 rounds.
 
@@ -185,6 +185,8 @@ Every non-player actor is a Behavior Tree over a Blackboard. Node types: Selecto
 
 **Cooldown decorators are measured in Passes and are not cleared by `reset_tree` or by an abort.** A guard that flees and comes back must not re-arm `call_backup`, or the Alarm tick fires every few steps and the Clock stops meaning anything.
 
+**Abandoning a RUNNING branch clears that subtree's ephemeral state** — RUNNING markers and repeat counters — so re-entering the branch starts it fresh; cooldowns survive, per the rule above. Without this, a "wait 2 turns" leaf returns SUCCESS instantly the second time it is entered, and a half-finished sequence resumes at its third child.
+
 Target choice is a Utility Score over candidates:
 
 `score = w_threat · (1 / max(1, distance)) + w_visible · visible + w_objective · objective_value − w_ally_risk · allied_fire_risk`
@@ -192,6 +194,39 @@ Target choice is a Utility Score over candidates:
 `distance` is Chebyshev. `objective_value` is 1.0 when the candidate is inside the room named by `objective` and 0.0 otherwise, so it needs no separate normalisation scale. `max(1, distance)` keeps the term finite when a target shares the actor's cell, which a player command can produce. Target switching requires beating the incumbent's score by that archetype's `target_hysteresis` (0.05–0.25), never by one global constant.
 
 Weights are per-archetype parameters. Spirits are the only friendly actors with a brain: they follow the summoner and act on their own tree.
+
+**Behavior Tree architecture (settled before the ticker was written).**
+
+- **Trees are immutable shared data; state is per actor.** One parsed tree per archetype, shared by every
+  actor of that type. Everything mutable — the RUNNING path, repeat counters, cooldowns — lives in a
+  per-actor `BTState` keyed by node path. A shared tree holding state is how two guards come to act in
+  lockstep or corrupt each other's branch.
+- **Leaves never spend Energy.** A leaf performs its game action and the ticker reports how much the step
+  cost; the caller deducts it from `ENERGY_COSTS` (§5). One place owns the accounting, so an assertion can
+  require that every leaf which can spend Energy declares a cost — a leaf that spends for itself can forget,
+  and a free action is a silent bug.
+- **Cooldowns key on the node's `name` when it has one, otherwise on its path.** An author who names two
+  nodes `call_backup` shares one timer deliberately; unnamed nodes are independent.
+- **Repeat `times: 0` means one repetition per decision step**, not an unbounded loop.
+- **`MAX_TICKS_PER_STEP = 64`.** A `Repeat` whose condition never changes spins inside one decision step
+  while spending no Energy, and the scheduler stalls with nothing to charge. Exceeding the cap raises a
+  `BTLivelock` error naming the tree and the path, so a hang becomes a diagnosis.
+
+**Archetype parameters — unplaytested defaults.** Moved here from `ai.md` §6.2 so all brain code reads one
+table. Expect these to move in Phase 1's playtest.
+
+| archetype | `w_threat` | `w_visible` | `w_objective` | `w_ally_risk` | `target_hysteresis` | `morale_bonus` | `flee_threshold` |
+|---|---|---|---|---|---|---|---|
+| Corp Guard | 1.0 | 2.0 | 1.5 | 3.0 | 0.10 | +1 | −4 |
+| Security Drone | 1.2 | 3.0 | 1.0 | 2.0 | 0.15 | — | never (machine) |
+| Ganger | 1.5 | 1.5 | 0.5 | 2.5 | 0.05 | 0 | −3 |
+| Corp Mage | 0.8 | 2.5 | 1.0 | 3.5 | 0.20 | 0 | −4 |
+| Hellhound | 2.0 | 2.0 | 1.0 | 0.5 | 0.25 | — | never |
+| Spirit | 2.0 | 2.0 | 1.0 | 1.0 | 0.10 | — | never (conjured) |
+
+Two of these carry design intent rather than taste: the Ganger's **lowest** hysteresis is its poor
+discipline, so do not "fix" its dithering with a wider margin, and the Corp Guard's ally-risk weight is the
+highest in the game because a rifle line through its own squad must hold fire.
 
 ## 9. Jobs, the Clock, and the world
 
@@ -329,7 +364,15 @@ Resolved since the first draft. Recorded because each resolution was a real choi
 19. **Save field names are `world.md` §10.4's**; `schema_version`, not `version`; never persist `qi`.
 20. **`world.md` §5 owns the Mission Graph generator**, and its 10-node ceiling replaces `data-model.md`'s 20.
 21. **Voluntary extraction grants Fixer reputation +1.**
-22. **Font**: Spleen 8×16 bitmap (BSD-2-Clause), vendored at `assets/vendor/fonts/spleen-8x16.bdf`. The geometry forces it — a TTF rasterises at an arbitrary size and fights the 16px grid, while Spleen's native height is exactly 16px so its glyph is a byte-for-byte paste into the left 8 columns of the cell. Cozette (MIT) stays the documented TTF alternative if the look ever changes; its vector build is upstream's own compatibility flag and is warned against at any size.
+22. **Font**: Spleen 8×16 bitmap (BSD-2-Clause), vendored at `assets/vendor/fonts/spleen-8x16.bdf`.
+23. **Behavior Tree state is per actor**; parsed trees are immutable and shared.
+24. **Abandoning a RUNNING branch clears its ephemeral state**, never its cooldowns.
+25. **Leaves never spend Energy**; the caller deducts `ENERGY_COSTS` from the ticker's reported cost.
+26. **Cooldowns key on node `name`, else node path.**
+27. **`MAX_TICKS_PER_STEP = 64`**; exceeding it raises `BTLivelock`.
+28. **`Repeat times: 0` = one repetition per decision step.**
+29. **Archetype weights and morale values adopted as unplaytested defaults** (`ai.md` §12 items 1–2 closed).
+30. **Self-targeted Heal is allowed** at the standard Drain. The geometry forces it — a TTF rasterises at an arbitrary size and fights the 16px grid, while Spleen's native height is exactly 16px so its glyph is a byte-for-byte paste into the left 8 columns of the cell. Cozette (MIT) stays the documented TTF alternative if the look ever changes; its vector build is upstream's own compatibility flag and is warned against at any size.
 
 Still open, and genuinely undecided:
 

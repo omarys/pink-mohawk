@@ -138,6 +138,7 @@ def run_pass(actor):
         refresh(actor)                 # senses, morale, Utility Score -> target, alert floor
         status, spent = tick(actor)    # §4.3
         if status == FAILURE: break    # nothing applies: no useful action -> Pass ends
+        actor.energy -= spent          # the ONLY place Energy is deduced; leaves never spend
         if spent == 0: break           # cannot buy anything useful -> Pass ends
     end_pass(actor)                    # Score -= 10, cooldowns -= 1, §5
 ```
@@ -1067,13 +1068,17 @@ Assertions are on the **trace**, not on internal variables: the trace is the con
 
 ## 12. Open questions
 
-Every number in §5, §6.2, §9 that is not in `DECISIONS.md` is listed here. Recommendations are defaults; they need a home in `DECISIONS.md` before code derives from them. Item 3 is settled by the contract and is kept only as a cross-reference.
+**All five items are closed.** They now live in `DECISIONS.md` §8 as contract values, so nothing here can
+drift from the code:
 
-1. **Utility weights and hysteresis** — §8 fixes the formula and says "weights are per-archetype parameters" but does not give the values. The table in §6.2 is a proposal and should move into `DECISIONS.md` §8 (recommended: yes, one table there, referenced by all brain code).
-2. **Morale threshold per archetype** — §8 fixes the formula (`wound_modifier + morale_bonus − allies_downed`), Ganger at Wound Modifier −3, and Hellhound at never. Guard −4, Mage −4, and the `morale_bonus` values are proposals (§6.2). The Security Drone has no morale branch at all.
-3. **Cover predicate** — settled by `DECISIONS.md` §4: a cell is in cover when it is adjacent to a blocking tile **and** the line of sight from the attacker to that cell is blocked; occupying it grants the +2. `has_cover_available`, `at_cover`, `seek_cover`, and `take_cover` all resolve against it.
-4. **Self-targeted Heal** — the Mage kit lists Heal; whether a Caster may Heal itself (the natural play for a lone Corp Mage behind cover) is undecided. Recommended: yes, with the Drain of §6.
-5. **Local rules worth a second opinion** — stated in the body, not invented numbers: Repeat `times:0` = one repetition per decision step (§4.4); Cooldown measured in Passes and immune to `reset_tree`/abort (§4.3); movement = one Step per decision step (§3.1). The last one is the one that matters most — it is what makes a Pass interruptible and RUNNING meaningful, and it is worth confirming before the ticker is written.
+1. **Utility weights and hysteresis** — values adopted as unplaytested defaults in `DECISIONS.md` §8.
+2. **Morale bonuses and flee thresholds** — likewise, in the same table.
+3. **Cover predicate** — settled by `DECISIONS.md` §4 (previous text kept as a cross-reference only).
+4. **Self-targeted Heal** — allowed at the standard Drain (`DECISIONS.md` §7).
+5. **Local rules** — `Repeat times: 0` is one repetition per decision step, cooldowns are measured in Passes
+   and survive a reset, and movement is one Step per decision step. The last is what makes a Pass
+   interruptible and `RUNNING` meaningful rather than decorative, and it is now a contract rule rather than a
+   recommendation (`DECISIONS.md` §8, §14 items 23–30).
 
 ---
 

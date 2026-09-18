@@ -229,6 +229,26 @@ UTILITY_WEIGHTS: Final = ("w_threat", "w_visible", "w_objective", "w_ally_risk")
 HYSTERESIS_MIN: Final = 0.05
 HYSTERESIS_MAX: Final = 0.25
 
+# A Repeat with a never-changing condition spins inside one decision step while spending no Energy.
+# The cap turns that hang into a diagnosable error rather than a frozen scheduler.
+MAX_TICKS_PER_STEP: Final = 64
+
+# Unplaytested defaults from DECISIONS §8. None means the archetype has no such branch.
+ARCHETYPE_WEIGHTS: Final = {
+    "corp_guard":     {"w_threat": 1.0, "w_visible": 2.0, "w_objective": 1.5, "w_ally_risk": 3.0,
+                       "hysteresis": 0.10, "morale_bonus": 1, "flee_threshold": -4},
+    "security_drone": {"w_threat": 1.2, "w_visible": 3.0, "w_objective": 1.0, "w_ally_risk": 2.0,
+                       "hysteresis": 0.15, "morale_bonus": None, "flee_threshold": None},
+    "ganger":         {"w_threat": 1.5, "w_visible": 1.5, "w_objective": 0.5, "w_ally_risk": 2.5,
+                       "hysteresis": 0.05, "morale_bonus": 0, "flee_threshold": -3},
+    "corp_mage":      {"w_threat": 0.8, "w_visible": 2.5, "w_objective": 1.0, "w_ally_risk": 3.5,
+                       "hysteresis": 0.20, "morale_bonus": 0, "flee_threshold": -4},
+    "hellhound":      {"w_threat": 2.0, "w_visible": 2.0, "w_objective": 1.0, "w_ally_risk": 0.5,
+                       "hysteresis": 0.25, "morale_bonus": None, "flee_threshold": None},
+    "spirit":         {"w_threat": 2.0, "w_visible": 2.0, "w_objective": 1.0, "w_ally_risk": 1.0,
+                       "hysteresis": 0.10, "morale_bonus": None, "flee_threshold": None},
+}
+
 # ---------------------------------------------------------------------------
 # Enemies — names only; stat blocks live in docs/design/enemies.md
 # ---------------------------------------------------------------------------
