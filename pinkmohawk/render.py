@@ -20,14 +20,18 @@ when someone is looking at a screen — guessing sheet indices here would be wor
 from __future__ import annotations
 
 import pathlib
-from typing import Final
+from typing import Any, Final
 
 import numpy as np
 import tcod.console
 import tcod.tileset
 
+from . import dialogue
 from .constants import (
     CLOCK_SEGMENTS,
+    HUB_TICKS_PER_DAY,
+    SCREEN_H,
+    SCREEN_W,
     SITE_H,
     SITE_W,
     TILE_FLOOR,
@@ -55,6 +59,20 @@ ACTOR_RANGE: Final = (0xE010, 0xE02F)
 
 MUL_MEMORY: Final = (86, 102, 128)  # §8: the Memory tint, from the pipeline
 UI_BG: Final = (18, 18, 24)
+
+#: The Hub is authored at 80x38, which is VIEW_H exactly, so it draws 1:1 and never scrolls. That is
+#: the reason world.md §1.1 chose the size.
+HUB_WALL_FG: Final = (150, 150, 160)
+HUB_FLOOR_FG: Final = (86, 86, 96)
+HUB_LABEL_FG: Final = (112, 132, 168)
+HUB_NPC_FG: Final = (232, 208, 120)
+HUB_CREW_FG: Final = (255, 255, 255)
+PANEL_BG: Final = (12, 14, 20)
+PANEL_TITLE_FG: Final = (240, 220, 160)
+PANEL_ROW_FG: Final = (206, 206, 214)
+PANEL_PICK_FG: Final = (150, 230, 150)
+PANEL_HINT_FG: Final = (140, 140, 140)
+PANEL_STATUS_FG: Final = (255, 200, 120)
 
 
 def load_tileset() -> tcod.tileset.Tileset:
@@ -216,6 +234,186 @@ def _draw_ui(console: tcod.console.Console, run: RunState) -> None:
     )
 
 
+def draw_hub(
+    console: tcod.console.Console, hub: Any, *, selected: int = 0, status: str = ""
+) -> None:
+    """The district, one cell per cell, plus the UI band.
+
+    No FOV and no Memory here, and that is a decision rather than an omission: the Hub is authored,
+    not generated, so there is nothing to discover by looking. FOV is what a Site needs.
+    """
+    _clear(console)
+    tile_map = hub.map
+    for y in range(min(tile_map.h, VIEW_H)):
+        for x in range(min(tile_map.w, VIEW_W)):
+            wall = tile_map.is_wall(x, y)
+            console.rgb["ch"][y, x] = ord("#") if wall else ord(".")
+            console.rgb["fg"][y, x] = HUB_WALL_FG if wall else HUB_FLOOR_FG
+
+    # Zone labels are text on the floor fill: world.md §1.1 says a label occupies no special tile.
+    for zone in hub.zones:
+        x, y, _w, _h = zone.rect
+        console.print(x + 1, y, f"[{zone.name}]", fg=HUB_LABEL_FG, bg=(0, 0, 0))
+
+    for npc in hub.npcs:
+        console.rgb["ch"][npc.pos[1], npc.pos[0]] = ord(npc.glyph)
+        console.rgb["fg"][npc.pos[1], npc.pos[0]] = HUB_NPC_FG
+
+    console.rgb["ch"][hub.pos[1], hub.pos[0]] = ord("@")
+    console.rgb["fg"][hub.pos[1], hub.pos[0]] = HUB_CREW_FG
+
+    _draw_hub_ui(console, hub, selected=selected, status=status)
+
+
+def _draw_hub_ui(console: tcod.console.Console, hub: Any, *, selected: int, status: str) -> None:
+    """Rows 38-44: the world clock, the world's numbers, the selected Runner, and where you are."""
+    top = VIEW_H
+    for row in range(top, top + UI_ROWS):
+        console.rgb["bg"][row, :] = UI_BG
+
+    state = hub.campaign
+    left = HUB_TICKS_PER_DAY - hub.ticks
+    console.print(
+        1,
+        top,
+        f"DAY {state.hub_day}  ({left:>3} ticks left)   {state.nuyen:,}¥   HEAT {state.heat}"
+        f"   FIXER {state.rep_fixer:+d}   LEGWORK {hub.legwork_remaining}/3",
+        fg=(255, 200, 120),
+        bg=UI_BG,
+    )
+
+    index = min(max(selected, 0), len(state.runners) - 1)
+    sheet = state.runners[index]
+    console.print(
+        1,
+        top + 2,
+        f"{sheet.id:<7} P{sheet.physical:>2}/{sheet.physical_max:<2} S{sheet.stun:>2}/{sheet.stun_max:<2}"
+        f"  XP {sheet.xp:<3} EDGE {sheet.edge}  gear {len(sheet.loadout)}",
+        fg=(150, 200, 150),
+        bg=UI_BG,
+    )
+
+    zone = hub.zone_at(hub.pos)
+    if zone is not None:
+        console.print(1, top + 3, f"{zone.name}: {zone.mechanics[0]}", fg=(200, 200, 200), bg=UI_BG)
+    here = [npc.name for npc in hub.npcs if npc.pos == hub.pos]
+    if here:
+        console.print(
+            1, top + 4, f"{here[0]} is here - Enter to talk", fg=(232, 208, 120), bg=UI_BG
+        )
+
+    if status:
+        console.print(1, top + 5, status[:78], fg=PANEL_STATUS_FG, bg=UI_BG)
+    console.print(
+        1,
+        top + 6,
+        "move: arrows/hjkl  Enter: talk  o: board  i: shop  c: clinic  r: rest  "
+        "v: scout  t: favour  d: depart  Tab: crew  Esc: quit",
+        fg=PANEL_HINT_FG,
+        bg=UI_BG,
+    )
+
+
+def draw_panel(
+    console: tcod.console.Console,
+    *,
+    title: str,
+    entries: list[str],
+    hint: str = "",
+    cursor: int | None = None,
+    status: str = "",
+) -> None:
+    """A list screen over the map area: the Job board, a shop, the clinic.
+
+    One function because they differ only in their rows and their prompt, and a per-screen renderer
+    would be three copies of this one.
+    """
+    _clear(console, rows=VIEW_H)
+    console.print(2, 1, title.upper(), fg=PANEL_TITLE_FG, bg=PANEL_BG)
+    for index, entry in enumerate(entries[: VIEW_H - 5], start=1):
+        picked = index - 1 == cursor
+        console.print(
+            2,
+            index + 2,
+            f"{index}. {entry}"[: VIEW_W - 4],
+            fg=PANEL_PICK_FG if picked else PANEL_ROW_FG,
+            bg=PANEL_BG,
+        )
+    if status:
+        console.print(2, VIEW_H - 2, status[: VIEW_W - 4], fg=PANEL_STATUS_FG, bg=PANEL_BG)
+    console.print(2, VIEW_H - 1, hint[: VIEW_W - 4], fg=PANEL_HINT_FG, bg=PANEL_BG)
+    _draw_band_background(console)
+
+
+def draw_talk(console: tcod.console.Console, presenter: dialogue.RecordingPresenter) -> None:
+    """A conversation: the recent lines, then the choices with their numbers."""
+    _clear(console, rows=VIEW_H)
+    lines = presenter.lines[-6:]
+    for index, (speaker, text) in enumerate(lines):
+        console.print(2, 1 + index * 2, f"{speaker}: "[:22], fg=PANEL_TITLE_FG, bg=PANEL_BG)
+        console.print(
+            4 + len(speaker), 1 + index * 2, text[: VIEW_W - 8], fg=PANEL_ROW_FG, bg=PANEL_BG
+        )
+    choices = presenter.shown[-1] if presenter.shown else []
+    base = max(len(lines) * 2 + 2, VIEW_H - 4 - len(choices))
+    for index, text in enumerate(choices):
+        console.print(
+            2, base + index, f"{index + 1}. {text}"[: VIEW_W - 4], fg=PANEL_PICK_FG, bg=PANEL_BG
+        )
+    if not choices:
+        console.print(2, base, "(Enter to continue)", fg=PANEL_HINT_FG, bg=PANEL_BG)
+    _draw_band_background(console)
+
+
+def _clear(console: tcod.console.Console, *, rows: int | None = None) -> None:
+    """Blank the map area (or the whole screen) to black, so a frame never inherits the last one."""
+    up_to = VIEW_H if rows is None else rows
+    console.rgb["ch"][:up_to, :] = 0x20
+    console.rgb["fg"][:up_to, :] = (0, 0, 0)
+    console.rgb["bg"][:up_to, :] = (0, 0, 0)
+
+
+def _draw_band_background(console: tcod.console.Console) -> None:
+    for row in range(VIEW_H, VIEW_H + UI_ROWS):
+        console.rgb["bg"][row, :] = UI_BG
+
+
+def check_hub() -> None:
+    """Headless: the district draws, a panel draws, and a conversation draws."""
+    from . import campaign as campaign_mod
+    from . import hub as hub_mod
+
+    hub = hub_mod.Hub(campaign_mod.new_campaign(20260918))
+    console = tcod.console.Console(SCREEN_W, SCREEN_H)
+    draw_hub(console, hub)
+    drawn = sum(1 for row in console.rgb["ch"][:VIEW_H] for cell in row if cell != 0x20)
+    assert drawn > 2000, f"the district should be mostly drawn, got {drawn} cells"
+    assert hub.zones, "the district has zones to label"
+
+    draw_panel(
+        console,
+        title="Job board",
+        entries=["job_001  extraction  12,000¥", "job_002  extraction  12,000¥"],
+        hint="1-9 take, Esc back",
+        cursor=0,
+    )
+    panel_cells = sum(1 for row in console.rgb["ch"][:VIEW_H] for cell in row if cell != 0x20)
+    band_cells = sum(1 for row in console.rgb["ch"][VIEW_H:] for cell in row if cell != 0x20)
+    assert panel_cells > 20, f"the panel should draw its rows, got {panel_cells}"
+    assert band_cells > 0, "a panel keeps the Hub band: a shop is where you want to see your money"
+
+    presenter = dialogue.RecordingPresenter(
+        lines=[("fixer", "Pay is 12k. In and out.")], shown=[["I'm in.", "Not interested."]]
+    )
+    draw_talk(console, presenter)
+    talked = sum(1 for row in console.rgb["ch"][:VIEW_H] for cell in row if cell != 0x20)
+    assert talked > 30, f"a conversation should draw its lines and choices, got {talked}"
+    print(
+        f"OK  render_hub: {hub.map.w}x{hub.map.h} district, {len(hub.zones)} zones, "
+        f"{len(hub.npcs)} NPCs, {drawn} cells drawn, panel and conversation views drawn"
+    )
+
+
 def check() -> None:
     """Headless verification: the recipe loads, the frame has content, and the UI band is drawn."""
     tileset = load_tileset()
@@ -237,5 +435,6 @@ if __name__ == "__main__":
 
     if "--check" in sys.argv:
         check()
+        check_hub()
     else:
         print(__doc__)

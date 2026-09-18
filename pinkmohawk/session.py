@@ -80,24 +80,6 @@ class CampaignHost:
         raise RuntimeFailure(["no bound Runner to speak for the crew"])
 
 
-@dataclass
-class ScriptedPresenter:
-    """`dialogue.Presenter` that keeps what a screen would have shown, so a test can assert on it."""
-
-    lines: list[tuple[str, str]] = field(default_factory=list)
-    shown: list[tuple[str, ...]] = field(default_factory=list)
-    closed: str | None = None
-
-    def line(self, speaker: str, text: str) -> None:
-        self.lines.append((speaker, text))
-
-    def choices(self, texts: tuple[str, ...] | list[str]) -> None:
-        self.shown.append(tuple(texts))
-
-    def close(self, reason: str) -> None:
-        self.closed = reason
-
-
 def choose_index(shown: tuple[str, ...], wants: tuple[str, ...]) -> int:
     """The index to pick at a choice screen: the first `wants` entry that matches a shown choice.
 
@@ -117,17 +99,12 @@ def play(
     conversation: dialogue.Conversation,
     *,
     wants: tuple[str, ...] = (),
-    pc_actor: str = "pc",
-) -> ScriptedPresenter:
-    """Drive a conversation to its end, preferring `wants` at every choice screen.
+) -> dialogue.RecordingPresenter:
+    """Drive an already-started conversation to its end, preferring `wants` at each choice screen.
 
     The budget is the engine's own AUTO_ADVANCE_BUDGET, so a conversation that cannot finish fails
     here the way it fails in play rather than hanging a test.
     """
-    runner.start(
-        actors={conversation.interlocutor or "npc": "npc", conversation.pc: pc_actor},
-        pc_actor=pc_actor,
-    )
     for _ in range(AUTO_ADVANCE_BUDGET):
         if runner.state == dialogue.RunnerState.WAITING_CONTINUE:
             runner.advance()
@@ -170,17 +147,16 @@ class Session:
         return Session.load(self.path)
 
     # -- talking ---------------------------------------------------------------------------
-    def talk(
+    def begin_talk(
         self,
         conversation_id: str,
         *,
         runner_id: str | None = None,
-        wants: tuple[str, ...] = (),
-        presenter: ScriptedPresenter | None = None,
+        presenter: dialogue.RecordingPresenter | None = None,
         dice: Any = None,
         seed: int = 0,
-    ) -> ScriptedPresenter:
-        """Run one conversation at the Hub. Returns what the screen would have shown.
+    ) -> dialogue.DialogueRunner:
+        """Build and start a conversation WITHOUT driving it, so a screen can step it key by key.
 
         `dice` is injected rather than assumed: play passes the seeded stream, and a test passes
         ScriptedDice so a social roll's outcome is chosen rather than hoped for.
@@ -194,11 +170,31 @@ class Session:
         engine = dialogue.DialogueRunner(
             conversation,
             self.campaign,
-            presenter or ScriptedPresenter(),
+            presenter if presenter is not None else dialogue.RecordingPresenter(),
             dice if dice is not None else dialogue.RandomDice(random.Random(seed)),
             CampaignHost(self.campaign, self.run),
         )
-        return play(engine, conversation, wants=wants)
+        engine.start(
+            actors={conversation.interlocutor or "npc": "npc", conversation.pc: "pc"},
+            pc_actor="pc",
+        )
+        return engine
+
+    def talk(
+        self,
+        conversation_id: str,
+        *,
+        runner_id: str | None = None,
+        wants: tuple[str, ...] = (),
+        presenter: dialogue.RecordingPresenter | None = None,
+        dice: Any = None,
+        seed: int = 0,
+    ) -> dialogue.RecordingPresenter:
+        """Run one conversation to its end. Returns what the screen would have shown."""
+        engine = self.begin_talk(
+            conversation_id, runner_id=runner_id, presenter=presenter, dice=dice, seed=seed
+        )
+        return play(engine, engine.conversation, wants=wants)
 
     def _declare(self, conversation: dialogue.Conversation) -> None:
         """Declare a conversation's own `test.*` and `flags.*` keys in the campaign store.
@@ -242,17 +238,22 @@ class Session:
         )
         return self.run
 
-    def come_home(self, *, voluntary: bool, net_negotiation_hits: int = 0) -> Extraction:
-        """Run to Hub: price it, apply all three consequences in one place, and autosave."""
-        if self.run is None:
-            raise RuntimeFailure(["no Run in flight"])
-        extraction = run_mod.extract(
-            self.run, voluntary=voluntary, net_negotiation_hits=net_negotiation_hits
-        )
+    def report(self, extraction: Extraction) -> Extraction:
+        """Run to Hub: apply all three consequences in one place, drop the Run, and autosave."""
         self.hub.report_extraction(extraction)
         self.run = None
         self.save()
         return extraction
+
+    def come_home(self, *, voluntary: bool, net_negotiation_hits: int = 0) -> Extraction:
+        """Price a finished Run and come home, which is the two-step `report` wraps."""
+        if self.run is None:
+            raise RuntimeFailure(["no Run in flight"])
+        return self.report(
+            run_mod.extract(
+                self.run, voluntary=voluntary, net_negotiation_hits=net_negotiation_hits
+            )
+        )
 
 
 # ==============================================================================================
