@@ -155,7 +155,7 @@ def build_spirit(summoner_id: int, spirit_type: str, actor_id: int, pos: tuple[i
         faction="spirit",
         pos=pos,
         facing=0,
-        glyph=0xE020,
+        glyph=0xE02F,
         tint=(120, 220, 160),
         attrs=attrs,
         skills=dict.fromkeys(SKILLS, 3),

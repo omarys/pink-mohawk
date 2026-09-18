@@ -78,7 +78,7 @@ def main() -> int:
 
     print(
         f"OK  layer law holds across {len(list(PACKAGE.glob('*.py')))} modules "
-        f"(tcod importers: none yet; allowed: {sorted(ALLOWED_TCOD_IMPORTERS)})"
+        f"(tcod importers: {', '.join(sorted(grep_hits)) or 'none'}; allowed: {sorted(ALLOWED_TCOD_IMPORTERS)})"
     )
     return 0
 
