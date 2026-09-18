@@ -93,11 +93,11 @@ def score(weights: Weights, facts: CandidateFacts) -> float:
     return threat + seen + objective - risk
 
 
-def choose(
+def choose[T: Comparable](
     weights: Weights,
-    candidates: Sequence[tuple[Comparable, CandidateFacts]],
-    incumbent: Comparable | None = None,
-) -> Comparable | None:
+    candidates: Sequence[tuple[T, CandidateFacts]],
+    incumbent: T | None = None,
+) -> T | None:
     """argmax by the §6.3 rule, then apply the commitment margin. `None` when nothing is available.
 
     Switching requires beating the incumbent by `weights.hysteresis`; a healthy incumbent that merely

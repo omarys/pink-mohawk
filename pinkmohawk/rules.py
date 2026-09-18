@@ -195,14 +195,13 @@ class DamageResult:
     filled_physical: int = 0
 
 
-def apply_damage(actor: Actor, code: str, power: int, *, round_no: int = 0) -> DamageResult:
+def apply_damage(actor: Actor, code: str, power: int) -> DamageResult:
     """Mark boxes on the right monitor, converting Stun overflow 2:1 into Physical (§4).
 
     The odd Stun box is discarded, not carried: the contract states the conversion as 2 boxes to 1,
     and carrying a remainder would be a rule the document does not have. A Runner at a full Physical
     monitor is **Downed** — out of the Run, recovered at the Hub (ADR-0005, no permadeath in v1).
     """
-    del round_no  # reserved: effects are applied by the caller
     if power <= 0:
         return DamageResult(
             code, filled_stun=actor.stun.filled, filled_physical=actor.physical.filled
@@ -239,10 +238,11 @@ class AttackOutcome:
     applied: DamageResult | None
 
 
-def attack_pool(
-    actor: Actor, weapon: str, *, skill: str = "firearms", aim: int = 0, modifiers: int = 0
-) -> int:
-    """`attribute + skill + aim + modifiers`; the wound modifier is the caller's to include."""
+def attack_pool(actor: Actor, *, skill: str = "firearms", aim: int = 0, modifiers: int = 0) -> int:
+    """`attribute + skill + aim + modifiers`; the wound modifier is the caller's to include.
+
+    The attribute is Agility for every weapon in v1 (DECISIONS §5), so the weapon is not a parameter.
+    """
     attribute = "agility"
     return actor.attrs[attribute] + actor.skills[skill] + min(aim, AIM_MAX_BONUS) + modifiers
 
@@ -272,7 +272,7 @@ def resolve_attack(
     overrides the derived pool, for a caller that has already accounted for something unusual.
     """
     damage = weapon_damage(weapon, attacker.attrs["strength"])
-    atk = roll(attack_pool(attacker, weapon, skill=skill, aim=aim, modifiers=attack_modifiers), rng)
+    atk = roll(attack_pool(attacker, skill=skill, aim=aim, modifiers=attack_modifiers), rng)
     dfn = roll(defence_pool(defender, cover=cover), rng)
     result = opposed(atk, dfn)
     modified_dv = damage.power + result.net

@@ -59,24 +59,9 @@ def run_seed(root: int, job_id: str, run_counter: int) -> int:
     return derive(root, f"run:{job_id}:{run_counter}")
 
 
-def hub_stream(root: int, hub_day: int, name: str) -> int:
-    """A Hub-side draw (shop stock and friends), namespaced away from the Run streams."""
-    return derive(root, f"hub:{hub_day}:{name}")
-
-
 def make_static_rngs(seed: int) -> dict[str, random.Random]:
     """One Random per static stream, all derived from the same root."""
     return {name: random.Random(derive(seed, name)) for name in sorted(STATIC_STREAMS)}
-
-
-def actor_rng(seed: int, actor_id: int) -> random.Random:
-    """Per-actor stream. Every actor's draws are independent of every other actor's."""
-    return random.Random(derive(seed, f"ai:{actor_id}"))
-
-
-def spawn_stream(seed: int, name: str) -> random.Random:
-    """Catch-all for a parameterised stream such as an embedding retry: `gen.embed:2`."""
-    return random.Random(derive(seed, name))
 
 
 def demo() -> None:

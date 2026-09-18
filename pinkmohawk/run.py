@@ -175,7 +175,7 @@ def ai_step(run: RunState, actor: Actor) -> tuple[bt.Status | None, int]:
     if actor.bt is None:
         raise ValidationError([f"actor {actor.id} is player-controlled"])
     if run._pass_seen.get(actor.id) != actor.pass_no:
-        bt.reset_tree(tree_for(actor), actor.bt)
+        actor.bt.reset_tree()
         run._pass_seen[actor.id] = actor.pass_no
 
     ai.refresh(actor, run.world)
@@ -278,7 +278,7 @@ def see(run: RunState, actor: Actor) -> int:
 
 def command_attack(run: RunState, actor: Actor, weapon: str | None = None) -> bool:
     """Shoot the nearest thing in range. The tree catalogue's action, driven by a person."""
-    weapon = weapon or _equipped(actor)
+    weapon = weapon or _equipped()
     if weapon is None:
         return False
     nearest = min(
@@ -304,8 +304,12 @@ def command_wait(run: RunState, actor: Actor) -> None:
     end_pass(run, actor)
 
 
-def _equipped(actor: Actor) -> str | None:
-    """The best weapon in the stat block's table that this actor can actually use."""
+def _equipped() -> str | None:
+    """v1: the best weapon in the table, for every Runner.
+
+    Not per-class yet. classes.md gives the Decker and the Mage their own kits, and run.command_attack
+    takes an explicit weapon, so a class kit is a caller's decision rather than this default's.
+    """
     from .constants import WEAPONS
 
     candidates = [w for w in WEAPONS if w != "hellhound_bite"]

@@ -44,7 +44,7 @@ from .constants import (
     SPIRIT_ATTACKS,
     WEAPONS,
 )
-from .entities import Actor, Effect, EnemyRole, RunnerRole, SpiritRole
+from .entities import Actor, Blackboard, Effect, EnemyRole, RunnerRole, SpiritRole
 from .errors import ValidationError
 from .fov import compute_fov_into, has_los, line_cells
 from .grid import TileMap
@@ -444,12 +444,11 @@ CONDITION_HANDLERS: Final[dict[str, Callable[[Actor, Mapping[str, Any], World], 
 }
 
 
-def _bb(actor: Actor) -> Any:
+def _bb(actor: Actor) -> Blackboard:
     """The Blackboard, created on first use. A brain without one is a bug, not a state."""
     if actor.bb is None:
-        from .entities import Blackboard
-
         actor.bb = Blackboard()
+    assert actor.bb is not None, "created two lines up"
     return actor.bb
 
 
@@ -520,8 +519,9 @@ def act_track_by_scent(
 
 def act_retreat(actor: Actor, args: Mapping[str, Any], ctx: TickContext, world: World) -> Status:
     dest = args.get("dest")
-    if dest == "home" and _bb(actor).home_pos:
-        return step_on_map(world, actor, _bb(actor).home_pos, ctx)
+    home = _bb(actor).home_pos
+    if dest == "home" and home is not None:
+        return step_on_map(world, actor, home, ctx)
     if dest == "exit" and world.exit_cell:
         return step_on_map(world, actor, world.exit_cell, ctx)
     target = world.by_id(_bb(actor).target)
@@ -587,7 +587,7 @@ def act_attack_target(
     ctx.charge("attack")
     damage = weapon_damage(weapon, actor.attrs["strength"])
     aim = effect_magnitude(actor, "aim", world.round_no)
-    atk = roll(attack_pool(actor, weapon, aim=aim), world.rng)
+    atk = roll(attack_pool(actor, aim=aim), world.rng)
     dfn = roll(defence_pool(target, cover=target.cover > 0), world.rng)
     net = opposed(atk, dfn).net
     armour = world.armour.get(target.id, 0)

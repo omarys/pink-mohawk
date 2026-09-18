@@ -3,7 +3,7 @@
 ADR-0011 (objective-first: graph first, then space); the algorithm, room sizes, retry policy and
 verification rules are in docs/design/world.md §6. DECISIONS §9 fixes the Site at 60x60.
 
-    .venv/bin/python -m pinkmohawk.embed      # the acceptance test, currently red
+    .venv/bin/python -m pinkmohawk.embed      # the acceptance test
 
 WHY THIS IS THE HARD ONE
 ------------------------
@@ -15,26 +15,22 @@ the exit is the first room you find, two corridors punch through the vault wall,
 crashes. So build the structural asserts first (they are written below), get them green, and only
 then work on how it *looks*.
 
-WHAT IS ALREADY DONE FOR YOU
-----------------------------
+WHAT IS HERE
+------------
 * `Room`, `Site`, `EmbedError` — the data contract.
 * `verify(site, graph)` — the acceptance oracle, fully implemented over the finished `unionfind`
   and `pathfinding` modules. It is deliberately written independently of the generator, so it can
   disagree with it: if your embedder and this verifier disagree, one of them is wrong and the
   disagreement is the bug report. `embed()` must call it before returning a Site.
-* `demo()` — the acceptance test, complete. It currently fails at the first call to `embed`.
+* `demo()` — the acceptance test.
 
-WHAT IS YOURS
--------------
-Five functions, in dependency order:
-
-| Function | What it must do |
-|---|---|
-| `bsp_leaves` | size-aware BSP: one leaf per room, cutting so each subtree can host the rooms it holds, returning leaves in room order |
-| `place_rooms` | one room per leaf, sized from `ROOM_INTERIOR`/`OBJECTIVE_INTERIOR` by node type, positioned with at least `WALL_MARGIN` of wall, **never overlapping another room** |
-| `carve_corridor` | an L-corridor, 1 cell wide, between two rooms, plus a doorway cell in each room's wall — H-then-V or V-then-H by a coin flip |
-| `embed` | orchestrate: split, order leaves by graph depth, place, carve one corridor per graph edge, verify, and **retry on a fresh derived stream**, falling back to the spine after `MAX_EMBED_ATTEMPTS` |
-| `spine_layout` | the guaranteed fallback: rooms left-to-right in depth order at fixed y, straight horizontal corridors. Cannot fail verification by construction |
+HOW IT IS BUILT
+---------------
+Five parts, in dependency order. `bsp_leaves` sizes the split so each subtree can host the rooms it
+holds; `place_rooms` gives one leaf each, sized by node type and kept `WALL_MARGIN` off every wall;
+`carve_corridor` runs an L between two rooms and puts a doorway in each wall; `embed` orchestrates and
+retries on a fresh derived stream, falling back to the spine after `MAX_EMBED_ATTEMPTS`; and
+`spine_layout` is the fallback that cannot fail verification by construction.
 
 THE PART THAT IS ACTUALLY DESIGN
 --------------------------------
@@ -250,7 +246,7 @@ def _split(x: int, y: int, w: int, h: int, sizes: list[tuple[int, int]], rng: ra
 
 
 # ======================================================================================
-# YOURS: the generator
+# The generator: BSP split, room placement, corridors
 # ======================================================================================
 def bsp_leaves(width: int, height: int, sizes: Sequence[tuple[int, int]], rng: random.Random):
     """One leaf per room, in room order, or None when the map cannot host them."""
@@ -261,8 +257,6 @@ def place_rooms(
     graph: MissionGraph,
     leaves: Sequence[tuple[int, int, int, int]],
     rng: random.Random,
-    width: int = SITE_W,
-    height: int = SITE_H,
 ) -> dict[int, Room]:
     nodes = _ordered_nodes(graph)
     if len(leaves) != len(nodes):
@@ -327,7 +321,7 @@ def embed(
         if leaves is None:
             continue
         try:
-            rooms = place_rooms(graph, leaves, rng, width, height)
+            rooms = place_rooms(graph, leaves, rng)
         except EmbedError:
             continue
         site = _finish(graph, rooms, width, height, rng, attempt + 1, False)
@@ -382,8 +376,6 @@ def spine_layout(graph: MissionGraph, width: int = SITE_W, height: int = SITE_H)
         # "Cannot fail" applies to connectivity, not to impossible geometry or the spacing rule.
         raise EmbedError(f"spine layout failed verification: {problems[:3]}")
     return site
-
-    # Side
 
 
 # ======================================================================================

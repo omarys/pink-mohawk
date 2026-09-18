@@ -136,7 +136,7 @@ class BTState:
         if node.child is not None:
             self.clear_branch(node.child)
 
-    def reset_tree(self, tree: Tree) -> None:
+    def reset_tree(self) -> None:
         """The Pass boundary (ai.md §3.1): resume indices and repeat counters cleared."""
         self.resume.clear()
         self.repeats.clear()
@@ -164,9 +164,6 @@ class TickContext:
         amount = ENERGY_COSTS[action_key] * times
         self.cost += amount
         self.actions.append((action_key, amount))
-
-    def free(self) -> None:
-        """Record a step that took no Energy (a failed prerequisite, a no-op)."""
 
 
 # ----------------------------------------------------------------------------------------------
@@ -496,11 +493,6 @@ def _abandon_siblings(state: BTState, node: Node, winner: int) -> None:
         state.running.pop(node.path, None)
 
 
-def reset_tree(tree: Tree, state: BTState) -> None:
-    """The Pass boundary: ephemeral state cleared, cooldowns kept (ai.md §3.1, DECISIONS §8)."""
-    state.reset_tree(tree)
-
-
 def tick_cooldowns(state: BTState) -> None:
     """Advance every armed cooldown by one Pass. Called at the Pass boundary, never per action."""
     for key in list(state.cooldowns):
@@ -686,7 +678,7 @@ def demo() -> None:
     assert tick(cd, st, scripted([]), TickContext())[0] is Status.FAILURE, (
         "armed -> FAILURE at 0 cost"
     )
-    reset_tree(cd, st)
+    st.reset_tree()
     assert st.cooldowns == {"shout_cd": 3}, "reset_tree must NOT clear cooldowns"
     tick_cooldowns(st)
     tick_cooldowns(st)

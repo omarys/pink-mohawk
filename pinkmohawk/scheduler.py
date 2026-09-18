@@ -56,11 +56,12 @@ class BucketQueue:
 
     def __init__(self, max_energy: int = MAX_ENERGY) -> None:
         self.max_energy = max_energy
+        self.max_energy = max_energy
         self.buckets: list[list[Any]] = [[] for _ in range(max_energy + 1)]
         self.top = -1
         self._count = 0
 
-    def insert(self, actor: Any, energy: int) -> None:
+    def insert(self, actor: ActorLike, energy: int) -> None:
         e = max(0, min(int(energy), self.max_energy))  # clamp: never index out of range
         self.buckets[e].append(actor)
         self._count += 1
@@ -91,14 +92,15 @@ class HeapQueue:
     encodes the same tie-break as the bucket scan.
     """
 
-    __slots__ = ("_heap", "_tie")
+    __slots__ = ("_heap", "_tie", "max_energy")
 
     def __init__(self, max_energy: int = MAX_ENERGY) -> None:
+        self.max_energy = max_energy
         self._heap: list[tuple[int, int, int, int, Any]] = []
         self._tie = 0
 
-    def insert(self, actor: Any, energy: int) -> None:
-        e = max(0, min(int(energy), MAX_ENERGY))
+    def insert(self, actor: ActorLike, energy: int) -> None:
+        e = max(0, min(int(energy), self.max_energy))
         self._tie += 1
         heapq.heappush(
             self._heap, (-e, -int(actor.attrs["reaction"]), int(actor.id), self._tie, actor)

@@ -6,7 +6,7 @@ DECISIONS §13 rows 3 and 4; rationale and complexity in docs/design/data-model.
 implemented. `demo()` is the acceptance test: optimality against a BFS oracle on 200 random
 maps, the corner rule, and gradient consistency over the flow field.
 
-    .venv/bin/python -m pinkmohawk.pathfinding       # fails until you implement the four functions
+    .venv/bin/python -m pinkmohawk.pathfinding       # the acceptance test
 
 The cost model, which everything here follows from
 --------------------------------------------------
