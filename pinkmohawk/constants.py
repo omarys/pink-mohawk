@@ -385,3 +385,43 @@ PERK_DUPLICATE_XP: Final = 3
 MAGAZINE_RELOAD_COST: Final = 100
 
 # fmt: on
+
+
+# ==============================================================================================
+# Phase 2 - the Hub, dialogue, economy and persistence (DECISIONS.md section 16)
+# ==============================================================================================
+HUB_TICKS_PER_DAY: Final = 240  # Hub ticks per day
+HUB_RECOVER_BOXES_PER_DAY: Final = 2  # Hub recover boxes per day
+CLINIC_COST_PER_BOX: Final = 250  # Clinic cost per box
+CLINIC_REVIVE_DOWNED: Final = 1500  # Clinic revive downed
+JOB_OFFERS: Final = 3  # Job offers
+JOB_OFFER_ROTATION_DAYS: Final = 3  # Job offer rotation days
+MEDKIT_USES: Final = 3  # Medkit uses
+TRAUMA_PATCH_COST: Final = 750  # Trauma patch cost
+FAVOUR_REP_COST: Final = 1  # Favour rep cost
+FAVOUR_CLOCK_CREDIT: Final = 2  # Favour clock credit
+SIDE_OBJECTIVE_PAYOUT: Final = 2000  # Side objective payout
+PROTECTION_ROUNDS: Final = 5  # Protection rounds
+COURIER_DISCRETION_BONUS: Final = 3000  # Courier discretion bonus
+MAX_IN_DEGREE: Final = 2  # Max in degree
+CORRIDOR_LIGHT_EVERY: Final = 15  # Corridor light every
+HEAT_CLOCK_EXTRACTION: Final = 1  # Heat clock extraction
+ENEMY_SPAWN_MARGIN: Final = 4  # Enemy spawn margin
+CAMPAIGN_JOBS_V1: Final = 24  # Campaign jobs v1
+SHOP_STOCK_SIZE: Final = 6  # Shop stock size
+AUTO_ADVANCE_BUDGET: Final = 512  # Auto advance budget
+STARTING_NUYEN: Final = 5000  # Starting nuyen
+HEAT_START: Final = 0  # Heat start
+REP_MIN: Final = -5  # Rep min
+REP_MAX: Final = 5  # Rep max
+REP_DELTA_MAX: Final = 2  # Rep delta max
+FIXER_OPPOSED_POOL: Final = 4  # Fixer opposed pool
+HUB_DAY_START: Final = 1  # Hub day start
+JOB_TYPE_MULT: Final = {  # §16: payout base by job type
+    "extraction": 1.00,
+    "sabotage": 1.15,
+    "protection": 1.10,
+    "courier": 0.90,
+}
+CLOCK_START: Final = dict.fromkeys(JOB_TYPE_MULT, 0)  # §16: every job type starts the Clock at 0
+LOOT_WEIGHTS: Final = {"nuyen": 50, "data": 30, "consumable": 20}  # §16: side-node loot draw

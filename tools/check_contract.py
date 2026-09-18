@@ -145,6 +145,29 @@ def check_weights(md: str, C) -> None:
         )
 
 
+def check_phase2(md: str, C) -> None:
+    """Section 16's tables. The label's slug uppercased is the constant's name."""
+    for cells in table_after(md, "| Parameter | Value |"):
+        k, v = key(cells[0]), leading_int(cells[1])
+        name = k.upper()
+        if not hasattr(C, name):
+            problems.append(f"phase 2 params: {cells[0]!r} -> constants.{name} does not exist")
+            continue
+        expect("phase 2 params", name, v, getattr(C, name))
+    for cells in table_after(md, "| Job type | Multiplier |"):
+        k = key(cells[0])
+        if k in C.JOB_TYPE_MULT:
+            expect("job type multipliers", k, float(cells[1]), C.JOB_TYPE_MULT[k])
+    for cells in table_after(md, "| Job type | Clock start |"):
+        k = key(cells[0])
+        if k in C.CLOCK_START:
+            expect("clock start", k, leading_int(cells[1]), C.CLOCK_START[k])
+    for cells in table_after(md, "| Loot | Weight |"):
+        k = key(cells[0])
+        if k in C.LOOT_WEIGHTS:
+            expect("loot weights", k, leading_int(cells[1]), C.LOOT_WEIGHTS[k])
+
+
 def main() -> int:
     if not DOC.exists():
         print(f"missing {DOC}")
@@ -161,6 +184,7 @@ def main() -> int:
         check_energy,
         check_gear,
         check_weights,
+        check_phase2,
     ):
         before = len(problems)
         check(md, C)

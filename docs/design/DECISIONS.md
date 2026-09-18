@@ -423,3 +423,84 @@ Carried forward deliberately, with the mitigation recorded, not forgotten.
 - **Advance costs make the campaign short.** `new rating × 3` for a skill means roughly one Job per Advance, and a crew can approach maxed sheets inside the 24-Job v1 campaign. Either the campaign is shorter than assumed, or costs must climb with rating, or Jobs must get harder faster than Heat does.
 - **Two classes are interchangeable on some obstacles.** The Adept and the Shaman are the same cell on a forced door and on the paydata vault; the Mage and the Shaman are the same choice against soft targets. The roster is distinct where it matters (matrix devices are Decker-only, hostile Spirits are Mage-only) and undifferentiated where it does not.
 - **Gear prices and enemy stats were the thinnest parts of the contract.** Prices are now in section 9; enemy stats are still an open question, and more than one document depends on them.
+
+## 16. Phase 2 parameters
+
+Fixed here. `world.md` §11.2 proposed each of these and `dialogue.md` §11 asked for the rest; a
+proposed value that nothing enforces is a value with two homes waiting to diverge, which is the
+failure this file exists to prevent. `tools/check_contract.py` checks every table below.
+
+Three rulings were taken with them: the parameters are adopted as proposed, the Hub is a real tile
+map with collision and no FOV, and the campaign saves to one slot written at the safehouse and after
+payout.
+
+| Parameter | Value |
+|---|---|
+| Hub ticks per day | 240 |
+| Hub recover boxes per day | 2 |
+| Clinic cost per box | 250 |
+| Clinic revive downed | 1,500 |
+| Job offers | 3 |
+| Job offer rotation days | 3 |
+| Medkit uses | 3 |
+| Trauma patch cost | 750 |
+| Favour rep cost | 1 |
+| Favour clock credit | 2 |
+| Side objective payout | 2,000 |
+| Protection rounds | 5 |
+| Courier discretion bonus | 3,000 |
+| Max in degree | 2 |
+| Corridor light every | 15 |
+| Heat clock extraction | 1 |
+| Enemy spawn margin | 4 |
+| Campaign jobs v1 | 24 |
+| Shop stock size | 6 |
+| Auto advance budget | 512 |
+| Starting nuyen | 5,000 |
+| Heat start | 0 |
+| Rep min | -5 |
+| Rep max | 5 |
+| Rep delta max | 2 |
+| Fixer opposed pool | 4 |
+| Hub day start | 1 |
+
+Job type multipliers scale the payout base. `extraction` is the canonical key and `paydata` is
+`dialogue.md`'s name for the same type, aliased at the dialogue seam.
+
+| Job type | Multiplier |
+|---|---|
+| extraction | 1.00 |
+| sabotage | 1.15 |
+| protection | 1.10 |
+| courier | 0.90 |
+
+| Job type | Clock start |
+|---|---|
+| extraction | 0 |
+| sabotage | 0 |
+| protection | 0 |
+| courier | 0 |
+
+| Loot | Weight |
+|---|---|
+| nuyen | 50 |
+| data | 30 |
+| consumable | 20 |
+
+Resolutions this section makes, where the documents left a fork:
+
+- **`MIN_OBJECTIVE_DISTANCE = 12`** (item 32 above). `world.md` `[P13]` later proposed 20; the
+  contract value stands, and 12 is what `embed.py` implements.
+- **Payout does not double-count.** `payout_base = round(12000 × TYPE_MULT[type])` and the
+  negotiation result lands in `payout_agreed = payout_base + 100 × net hits`. `world.md` §4.1's
+  formula and `dialogue.md` §8's haggle are the same money arriving at one place, and the acceptance
+  test needs the base and the agreed figure to differ so a gated choice can move it.
+- **Job state** (`offered`, `accepted`, `active`, `complete`, `failed`) is written by Extraction, not
+  by the conversation: the Dialogue Graph offers and accepts, the Run completes or fails.
+- **`change_rep` takes `fixer` or `faction:<id>`**, and the save stores factions under
+  `world.rep.factions[<id>]` with the prefix stripped at that seam.
+- **Medical prices.** `CLINIC_COST_PER_BOX` and `CLINIC_REVIVE_DOWNED` are `[P3]` proposals rather
+  than contract figures, and `TRAUMA_PATCH_COST` is `[P5]`'s. Section 9 prices the shops; these three
+  are the Hub's services and are now fixed here instead.
+- **Condition Monitors persist as Hub state** (item 18); the save stores filled boxes only, and both
+  maximums stay derived from Body and Willpower per section 4.
