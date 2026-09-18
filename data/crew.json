@@ -1,0 +1,119 @@
+{
+  "_note": "The four Runners' starting blocks from docs/design/classes.md \u00a71.1-1.2. `powers` records the three-per-class v1 subset from roadmap.md Phase 1; the engine does not read them yet.",
+  "adept": {
+    "name": "Adept",
+    "glyph": 57376,
+    "edge": 3,
+    "qi": 4,
+    "attrs": {
+      "body": 6,
+      "agility": 7,
+      "reaction": 6,
+      "strength": 7,
+      "willpower": 4,
+      "logic": 3,
+      "intuition": 4,
+      "charisma": 3
+    },
+    "skills": {
+      "close_combat": 5,
+      "athletics": 5,
+      "firearms": 4,
+      "stealth": 4
+    },
+    "powers": [
+      "improved_reflexes",
+      "killing_hands",
+      "wall_run"
+    ],
+    "inventory": [
+      "medkit"
+    ]
+  },
+  "mage": {
+    "name": "Mage",
+    "glyph": 57377,
+    "edge": 3,
+    "tradition": "logic",
+    "attrs": {
+      "body": 3,
+      "agility": 3,
+      "reaction": 3,
+      "strength": 3,
+      "willpower": 5,
+      "logic": 6,
+      "intuition": 4,
+      "charisma": 4
+    },
+    "skills": {
+      "sorcery": 5,
+      "perception": 4
+    },
+    "powers": [
+      "manabolt",
+      "heal",
+      "armor"
+    ],
+    "inventory": [
+      "medkit"
+    ]
+  },
+  "shaman": {
+    "name": "Shaman",
+    "glyph": 57378,
+    "edge": 3,
+    "tradition": "charisma",
+    "attrs": {
+      "body": 4,
+      "agility": 4,
+      "reaction": 4,
+      "strength": 3,
+      "willpower": 5,
+      "logic": 3,
+      "intuition": 4,
+      "charisma": 6
+    },
+    "skills": {
+      "conjuring": 5,
+      "perception": 4
+    },
+    "powers": [
+      "summon_spirit",
+      "fear",
+      "ward"
+    ],
+    "inventory": [
+      "medkit"
+    ]
+  },
+  "decker": {
+    "name": "Decker",
+    "glyph": 57379,
+    "edge": 3,
+    "tradition": "logic",
+    "attrs": {
+      "body": 4,
+      "agility": 5,
+      "reaction": 5,
+      "strength": 3,
+      "willpower": 4,
+      "logic": 6,
+      "intuition": 5,
+      "charisma": 3
+    },
+    "skills": {
+      "cybercombat": 5,
+      "electronics": 4,
+      "firearms": 4
+    },
+    "powers": [
+      "scan",
+      "override_lock",
+      "disable_gun"
+    ],
+    "inventory": [
+      "medkit",
+      "trauma_patch"
+    ]
+  }
+}

@@ -34,7 +34,19 @@ type Coord = tuple[int, int]
 FACTIONS: Final = ("crew", "security", "spirit", "neutral")
 CLASSES: Final = ("adept", "mage", "shaman", "decker")
 SPIRIT_TYPES: Final = ("beast", "air", "earth", "water")
-DEVICE_KINDS: Final = ("gun", "optics", "door", "lock", "lights", "commlink", "drone", "cyberware")
+DEVICE_KINDS: Final = (
+    "gun",
+    "optics",
+    "door",
+    "lock",
+    "lights",
+    "commlink",
+    "drone",
+    "cyberware",
+    "cyberdeck",
+)  # the Decker carries one; DECISIONS §7 has no
+# rating row for it because it is gear, not
+# a fixture the Decker hacks
 OBJECT_KINDS: Final = ("device", "item", "corpse")
 
 
@@ -132,6 +144,9 @@ class EnemyRole:
     target_hysteresis: float
     home_pos: Coord
     flees_at_wound: int | None = None  # §8: Ganger −3; Hellhound and Drone never flee
+    # Added while writing content: §12's EnemyRole had no tradition, but the Corp Mage pays Drain with
+    # Logic (DECISIONS §6), so the caster archetypes need one.
+    tradition: str | None = None
 
 
 @dataclass(slots=True)
