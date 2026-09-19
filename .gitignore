@@ -10,3 +10,6 @@ assets/vendor/dcss-tiles/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# Runtime state: the one save slot is written by the game, never committed by a developer.
+saves/
