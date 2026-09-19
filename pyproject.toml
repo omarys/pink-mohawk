@@ -5,13 +5,13 @@
 # [project] + [build-system] plus a wheel target that names the package, or hatchling will sweep
 # `assets/` (2.6MB of art) into the distribution.
 #
-# The venv holds the runtime dependencies and mypy:
+# The venv holds the runtime dependencies and mypy. `mise run setup` builds it, and `mise.toml`
+# pins what goes in it — one environment, one place to look:
 #
-#     python3 -m venv .venv
-#     uv pip install --python .venv/bin/python tcod numpy mypy
+#     mise run setup          # python3 -m venv .venv && uv pip install tcod/ numpy/ mypy at pinned
 #
-# Python, ruff and black deliberately do NOT live in the venv — they come from mise (see mise.toml),
-# so there is one copy of each on the machine and the venv stays about the game.
+# Python, ruff, black, pre-commit and uv deliberately do NOT live in the venv — they come from mise
+# (see mise.toml), so there is one copy of each on the machine and the venv stays about the game.
 
 [tool.ruff]
 line-length = 100

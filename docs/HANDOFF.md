@@ -30,27 +30,35 @@ layer law), with the rationale in `docs/adr/`. The design docs for the systems P
 
 ## 2. How to verify (the operating ritual)
 
-Run all of these from the repo root. They are the gate for every change:
+From the repo root, one command:
 
 ```bash
-ruff format pinkmohawk tools && ruff check pinkmohawk tools
-.venv/bin/python -m mypy
-.venv/bin/python tools/check_contract.py      # DECISIONS.md <-> constants.py
-.venv/bin/python tools/check_layers.py        # tcod only in input/render/main
+mise run check
+```
 
-# every module's acceptance test
-for m in rng grid fov unionfind pathfinding scheduler mission_graph embed bt utility entities \
-         rules security ai placement content run input render main campaign save dialogue hub session; do
-  case $m in
-    render|main) .venv/bin/python -m pinkmohawk.$m --check || echo "FAIL $m" ;;
-    *)           .venv/bin/python -m pinkmohawk.$m || echo "FAIL $m" ;;
-  esac
-done
+That is `ruff format --check`, `ruff check`, `mypy`, `tools/check_contract.py`,
+`tools/check_layers.py` and `tools/run_suites.py`, in that order — the same six pieces the pre-commit
+hook runs, so a clean commit and a clean `mise run check` mean the same thing. Individually they are
+`mise run fmt-check`, `mise run lint`, `mise run types`, `mise run contract`, `mise run layers` and
+`mise run suites`; `mise tasks` lists them.
 
+The last two are the interesting ones and neither takes a module list:
+
+- `tools/check_layers.py` enforces the layer law — `tcod` may appear only in `input.py`, `render.py`
+  and `main.py`, and `dialogue.py` may not import the campaign.
+- `tools/run_suites.py` finds every module with a `demo()` (run plain) or a `check()` (run with
+  `--check`) and runs each in its own interpreter. **Adding a module adds its suite by existing**, so
+  there is no list to keep. `-v` shows each suite's own summary line.
+
+Expected: 25/25 suites, mypy clean on 31 files, 134 contract values, layer law across 28 modules,
+about three seconds end to end.
+
+```bash
 SDL_VIDEODRIVER=dummy .venv/bin/python -m pinkmohawk.main --frames 5   # real window loop, no display
 ```
 
-Expected: 25/25 suites, mypy clean on 30 files, 134 contract values, layer law across 28 modules.
+The environment itself is `mise run setup` (venv plus pinned dependencies) and `mise run hooks` (the
+pre-commit hook, once per clone); `mise.toml` holds every tool and dependency pin.
 
 **Toolchain placement matters and is easy to get wrong.** `ruff` is on `PATH` via `mise` (pinned in
 `mise.toml`); `mypy` and `tcod` exist **only** in `.venv`. So `ruff check` works bare, but everything

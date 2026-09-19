@@ -4,8 +4,73 @@
 # shim failed with "No version is set for shim: black" — which is confusing when you have just been
 # running black by hand. Pinning python, ruff and black here makes all three resolve from the repo
 # root, and keeps them out of the venv.
+#
+# `pre-commit` and `uv` arrived in exactly the same state: installed at `latest`, pinned nowhere. A
+# tool that resolves to a different version on two machines is the same bug as a number with two
+# homes, and this repository already keeps a checker for the second kind.
+#
+# The venv is deliberately NOT a mise tool. It holds the game's dependencies, which `mise run setup`
+# installs and pins in that task — one environment, one place to look, and no requirements file to
+# drift from it.
 
 [tools]
 python = "3.14.7"
 ruff = "0.16.7"
-black = "26.5.1"
+black = "26.5.1" # not the formatter: pinned so the shim resolves (see pyproject.toml)
+pre-commit = "4.6.2"
+uv = "0.12.15"
+
+# ==============================================================================================
+# Build and setup
+# ==============================================================================================
+
+[tasks.setup]
+description = "Create .venv and install the game's dependencies (tcod, numpy) plus mypy"
+run = """
+python3 -m venv .venv
+uv pip install --python .venv/bin/python "tcod==21.2.1" "numpy==2.5.3" "mypy==2.3.1"
+"""
+
+[tasks.hooks]
+description = "Install the pre-commit hook into .git/hooks (once per clone)"
+depends = ["setup"]
+run = "pre-commit install"
+
+# ==============================================================================================
+# The gate. `mise run check` is the whole thing, and .pre-commit-config.yaml runs the same pieces.
+# ==============================================================================================
+
+[tasks.format]
+description = "Write formatting, then lint what the formatter did not touch"
+run = """
+ruff format pinkmohawk tools
+ruff check --fix pinkmohawk tools
+"""
+
+[tasks.fmt-check]
+description = "Check formatting without writing"
+run = "ruff format --check pinkmohawk tools"
+
+[tasks.lint]
+description = "ruff check"
+run = "ruff check pinkmohawk tools"
+
+[tasks.types]
+description = "mypy (a venv tool, so it comes from the venv)"
+run = ".venv/bin/python -m mypy"
+
+[tasks.contract]
+description = "Every number in DECISIONS.md still matches constants.py"
+run = ".venv/bin/python tools/check_contract.py"
+
+[tasks.layers]
+description = "The layer law: tcod only in input/render/main, dialogue decoupled from the campaign"
+run = ".venv/bin/python tools/check_layers.py"
+
+[tasks.suites]
+description = "Every module's acceptance test, discovered rather than listed"
+run = ".venv/bin/python tools/run_suites.py"
+
+[tasks.check]
+description = "Everything this repository requires before a commit"
+depends = ["fmt-check", "lint", "types", "contract", "layers", "suites"]

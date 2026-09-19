@@ -1,0 +1,62 @@
+# The repository's own gate, run by the repository's own tools.
+#
+# `repo: local` on purpose, and not as a shortcut. A third-party hook repository installs *its* ruff
+# and *its* mypy at whatever versions it pins, so a commit could be checked by a different toolchain
+# than `mise run check` uses — and then "it passed locally" means two different things. The pins live
+# in mise.toml; these hooks call them.
+#
+# Every hook here runs in about three seconds in total, measured, so there is no fast/slow split: the
+# whole gate runs on every commit. The alternative is a pre-push stage that nobody remembers to run,
+# which is two ways to be wrong instead of one place to look.
+
+default_install_hook_types: [pre-commit]
+
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-format
+        name: ruff format --check (the one formatter)
+        entry: ruff format --check pinkmohawk tools
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      - id: ruff-check
+        name: ruff check
+        entry: ruff check pinkmohawk tools
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      # mypy reads its scope from pyproject.toml (`files = ["pinkmohawk", "tools"]`), so the hook does
+      # not repeat it. It runs from the venv because mypy is a venv tool, not a mise one.
+      - id: mypy
+        name: mypy
+        entry: .venv/bin/python -m mypy
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      # always_run: DECISIONS.md is the source of truth for these numbers, so a docs-only commit can
+      # break the contract just as easily as a code one.
+      - id: check-contract
+        name: DECISIONS.md <-> constants.py
+        entry: .venv/bin/python tools/check_contract.py
+        language: system
+        always_run: true
+        pass_filenames: false
+
+      - id: check-layers
+        name: the layer law (tcod only in input/render/main)
+        entry: .venv/bin/python tools/check_layers.py
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      # The demos are the test suite, and they read data/, so this one runs for any change at all.
+      - id: suites
+        name: every module's acceptance test
+        entry: .venv/bin/python tools/run_suites.py
+        language: system
+        always_run: true
+        pass_filenames: false
