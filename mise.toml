@@ -15,10 +15,10 @@
 
 [tools]
 python = "3.14.7"
-ruff = "0.16.7"
+ruff = "0.16.8"
 black = "26.5.1" # not the formatter: pinned so the shim resolves (see pyproject.toml)
 pre-commit = "4.6.2"
-uv = "0.12.15"
+uv = "0.12.16"
 
 # ==============================================================================================
 # Build and setup
